@@ -19,6 +19,7 @@ def dj_circuit(oracle:QuantumCircuit, n:int) -> QuantumCircuit:
         qc.measure(i, i)
     return qc
 
+# constant oracles 
 def const_oracle_zero(n:int) -> QuantumCircuit:
     oracle = QuantumCircuit(n+1)
     # For constant zero, do nothing (oracle leaves state unchanged)
@@ -31,4 +32,21 @@ def const_oracle_one(n:int) -> QuantumCircuit:
     oracle.x(ancilla)  # Flip the last qubit (output)
     return oracle
     
+# balanced oracle
 
+def balanced_oracle(n:int) -> QuantumCircuit:
+    oracle = QuantumCircuit(n+1)
+    # For balanced, we can use a CNOT from each input qubit to the output
+    ancilla = n  # index of last qubit
+    for i in range(n):
+        oracle.cx(i, ancilla)  # Flip output if input qubit is 1
+    return oracle
+
+def oracle_from_secret_string(s:str) -> QuantumCircuit:
+    n = len(s)
+    oracle = QuantumCircuit(n+1)
+    ancilla = n  # index of last qubit
+    for i, bit in enumerate(s):
+        if bit == '1':
+            oracle.cx(i, ancilla)  # Flip output if input qubit is 1
+    return oracle
