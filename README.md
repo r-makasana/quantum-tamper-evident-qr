@@ -1,15 +1,15 @@
 # Quantum Tamper-Evident QR Codes
 
-A QR code system that uses true quantum randomness for nonce generation and (planned) the Deutsch-Jozsa algorithm for single-query tamper verification. Built with Qiskit.
+A QR code system that uses true quantum randomness for nonce generation and the Deutsch-Jozsa algorithm for single-query tamper verification. Built with Qiskit.
 
-> **Status:** In development — Day 2 of 21 complete. Quantum RNG module ready and validated; tamper-verification pipeline coming.
+> **Status:** In development — Day 3 of 21 complete. Quantum RNG and Deutsch-Jozsa (constant case) modules ready; balanced oracle, full QR pipeline, and hardware execution coming.
 
 ## Motivation
 
 Standard QR codes are vulnerable to physical swap attacks (common in payment fraud) and digital tampering. This project explores whether quantum primitives can strengthen QR integrity:
 
 - **True randomness** — Nonces come from quantum measurements (Hadamard + measure), not pseudo-random functions, so they cannot be reproduced from a seed.
-- **Single-query verification (planned)** — A Deutsch-Jozsa oracle will let a verifier detect tampering in one quantum query instead of recomputing a full hash.
+- **Single-query verification** — A Deutsch-Jozsa oracle lets a verifier detect tampering in one quantum query: untampered → constant oracle → measures all zeros; tampered → balanced oracle → measures non-zero.
 
 This is primarily a learning and engineering exploration. A classical HMAC achieves tamper detection with less complexity; the value here is in implementing real quantum algorithms end-to-end and running them on actual quantum hardware.
 
@@ -21,20 +21,30 @@ This is primarily a learning and engineering exploration. A classical HMAC achie
 - Validated for uniformity with chi-square test (p = 0.XX on 10,000 bits)  ← *replace with your value*
 - Side-by-side comparison with Python's `random.getrandbits` in the notebook
 
+**Deutsch-Jozsa Circuit — Constant Case** (`quantum_qr/dj.py`)
+- General-purpose `build_dj_circuit(oracle, n)` that wraps any n-bit oracle into the full DJ circuit
+- `constant_oracle_zero(n)` and `constant_oracle_one(n)` for both constant cases
+- Verified: constant oracles produce `'0...0'` measurements with 100% probability over 1024 shots
+- Day 4 will add balanced oracles and demonstrate the tamper-detection direction
+
 ## Project structure
 
 ```
 quantum-tamper-evident-qr/
 ├── quantum_qr/
 │   ├── __init__.py
-│   └── qrng.py                       # Quantum random number generator
+│   ├── qrng.py                       # Quantum random number generator
+│   └── dj.py                         # Deutsch-Jozsa circuit + constant oracles
 ├── notebooks/
 │   ├── day1_qrng.ipynb               # First random bit + Hadamard intuition
-│   └── day2_qrng_scaling.ipynb       # 128-bit scaling + statistical validation
+│   ├── day2_qrng_scaling.ipynb       # 128-bit scaling + statistical validation
+│   └── day3_dj_constant.ipynb        # Deutsch-Jozsa, constant case
 ├── tests/
-│   └── test_qrng.py
+│   ├── test_qrng.py
+│   └── test_dj.py
 ├── data/
 │   └── sample_nonce.txt
+├── LEARNINGS.md                      # Daily learning log
 └── README.md
 ```
 
@@ -51,20 +61,25 @@ pip install qiskit qiskit-aer qrcode[pil] numpy matplotlib pylatexenc jupyter py
 ## Quick start
 
 ```python
-from quantum_qr.qrng import generate_quantum_random_bits, generate_quantum_nonce_hex
+from quantum_qr.qrng import generate_quantum_nonce_hex
+from quantum_qr.dj import build_dj_circuit, constant_oracle_zero
+from qiskit_aer import AerSimulator
 
-# 128-bit binary string from quantum measurements
-bits = generate_quantum_random_bits(128)
-print(bits)
-
-# Or as a hex nonce, ready for storage in a QR payload
+# 1. Generate a 128-bit quantum-random nonce
 nonce = generate_quantum_nonce_hex(128)
 print(nonce)  # 32 hex characters
+
+# 2. Build and run a DJ circuit on a constant oracle
+n = 4
+oracle = constant_oracle_zero(n)
+dj_circuit = build_dj_circuit(oracle, n)
+counts = AerSimulator().run(dj_circuit, shots=1024).result().get_counts()
+print(counts)  # {'0000': 1024} — constant!
 ```
 
 ## Validation results
 
-Quantum bits generated from a 128-qubit Hadamard circuit on `aer_simulator`:
+**Quantum RNG** (`aer_simulator`, 128-qubit Hadamard circuit):
 
 | Metric | Result |
 |---|---|
@@ -72,13 +87,21 @@ Quantum bits generated from a 128-qubit Hadamard circuit on `aer_simulator`:
 | Count of 0s / 1s | XXXX / XXXX  ← *fill in* |
 | Chi-square p-value | 0.XX           ← *fill in* |
 
-Notebook: `notebooks/day2_qrng_scaling.ipynb` — includes histograms, circuit diagram, and a contrast with pseudo-random output.
+**Deutsch-Jozsa, constant case** (n = 4, 1024 shots each):
+
+| Oracle | Measurement outcome | Frequency |
+|---|---|---|
+| `constant_oracle_zero` | `'0000'` | 100% |
+| `constant_oracle_one`  | `'0000'` | 100% |
+
+Notebooks contain histograms, circuit diagrams, and additional analysis.
 
 ## Roadmap
 
 - [x] **Day 1** — Environment setup, first quantum random bit
 - [x] **Day 2** — 128-bit QRNG module, statistical validation
-- [ ] **Day 3–4** — Deutsch-Jozsa circuit (constant and balanced oracles)
+- [x] **Day 3** — Deutsch-Jozsa circuit (constant oracles)
+- [ ] **Day 4** — Deutsch-Jozsa balanced oracles + classical QR library setup
 - [ ] **Day 5–6** — QR payload format design
 - [ ] **Day 7–11** — Generator module: combines QRNG + DJ oracle + QR image
 - [ ] **Day 12–16** — Verifier module: reads QR and runs DJ check
