@@ -21,6 +21,13 @@ A running log of what I learned each day building this project. Honest, conversa
 - Biggest "aha" moment: **phase kickback**. Putting the ancilla in |−⟩ = (|0⟩−|1⟩)/√2 causes the oracle to output a phase factor (−1)^f(x) on the input register instead of writing into the ancilla. The function's output value gets *encoded as a phase*, and interference at the second Hadamard layer reads it out.
 - For a constant function, all 2^n phases are identical, so the second Hadamard layer interferes them back into |0...0⟩. Any non-constant function breaks that perfect interference.
 - Verified with both `constant_oracle_zero` (do nothing — identity) and `constant_oracle_one` (a single X on the ancilla) → both gave `'0000'` with 100% probability over 1024 shots.
-- Realised DJ and Bernstein-Vazirani share the same circuit shape — same phase-kickback trick. That's why the original project's BV approach and my DJ approach are siblings, not duplicates: same machinery, different question asked of f.
 
-## Day 4 — (tomorrow)
+## Day 4 — DJ Balanced Case + QR Pipeline
+- Completed the Deutsch-Jozsa picture by building balanced oracles. A balanced oracle through DJ measures a **non-zero** bitstring — the mirror image of the constant case — because the phases no longer all align and don't interfere back to |0...0⟩.
+- Built `oracle_from_secret(s)` computing f(x) = s·x (mod 2) by placing a CNOT to the ancilla for each '1' bit in s. This one function unifies everything: s = all-zeros gives a constant oracle, any non-zero s gives a balanced one.
+- **Biggest realisation of the week:** DJ on `oracle_from_secret(s)` doesn't just say "balanced" — it *recovers s exactly* in a single query. That means the same circuit answering DJ's yes/no question also solves Bernstein-Vazirani. The original project used BV; mine uses the DJ framing of the same underlying machinery for tamper detection. Same physics, different question — siblings, not copies.
+- Had to mind the bit-ordering again when reading the recovered secret back out.
+- Built the classical half too: `quantum_qr/qr_io.py`. The `qrcode` library only *encodes*; for *decoding* I used OpenCV's `cv2.QRCodeDetector` rather than `pyzbar` because pyzbar needs the zbar system binary which is painful on Windows.
+- Round-trip test passed: encode a string → PNG → decode back to the identical string. The classical pipeline is now ready to carry quantum payloads next week.
+
+## Day 5 — (tomorrow)
