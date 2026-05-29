@@ -42,7 +42,8 @@ def balanced_oracle(n:int) -> QuantumCircuit:
         oracle.cx(i, ancilla)  # Flip output if input qubit is 1
     return oracle
 
-def oracle_from_secret_string(s:str) -> QuantumCircuit:
+# also called vazirani-bernstain algorithm
+def oracle_from_secret_string(s:str) -> QuantumCircuit:    
     n = len(s)
     oracle = QuantumCircuit(n+1)
     ancilla = n  # index of last qubit
