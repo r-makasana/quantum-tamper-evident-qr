@@ -2,7 +2,7 @@
 
 A QR code system that uses true quantum randomness for nonce generation and the Deutsch-Jozsa algorithm for single-query tamper verification. Built with Qiskit.
 
-> **Status:** In development — Day 4 of 21 complete. Quantum RNG, Deutsch-Jozsa (constant + balanced), and the classical QR encode/decode pipeline are all working. Payload design, full generator/verifier, and hardware execution coming.
+> **Status:** In development — Day 5 of 21 complete. All four quantum/classical building blocks working; payload schema and verify-flow now formally designed. Implementation of the end-to-end pipeline starts on Day 6.
 
 ## Motivation
 
@@ -12,6 +12,17 @@ Standard QR codes are vulnerable to physical swap attacks (common in payment fra
 - **Single-query verification** — A Deutsch-Jozsa oracle lets a verifier detect tampering in one quantum query: untampered → constant oracle → measures all zeros; tampered → balanced oracle → measures non-zero.
 
 This is primarily a learning and engineering exploration. A classical HMAC achieves tamper detection with less complexity; the value here is in implementing real quantum algorithms end-to-end and running them on actual quantum hardware.
+
+## Design
+
+The full payload schema, threat model, generate/verify flows, and limitations are documented in [`DESIGN.md`](DESIGN.md). In short:
+
+- QR payload is a base64-encoded JSON object: `{version, data, nonce, tag}`
+- `nonce` is 128 bits from the quantum RNG
+- `tag` is an HMAC-SHA256(K, data || nonce) truncated to **n = 8 bits**
+- Verification: recompute the expected tag, XOR with the observed tag to get a secret `s`, build `oracle_from_secret(s)`, run DJ
+- Authentic QR → s = 0 → constant oracle → DJ measures zeros
+- Tampered QR → s ≠ 0 → balanced oracle → DJ measures the differing bits
 
 ## What's working today
 
@@ -42,9 +53,6 @@ quantum-tamper-evident-qr/
 │   ├── dj.py                         # Deutsch-Jozsa circuit + oracles (constant, balanced, secret)
 │   └── qr_io.py                      # Classical QR encode/decode
 ├── notebooks/
-|   ├── data/
-│   |   ├──  sample_nonce.txt
-|   |   ├──  test_qr.png
 │   ├── day1_qrng.ipynb               # First random bit + Hadamard intuition
 │   ├── day2_qrng_scaling.ipynb       # 128-bit scaling + statistical validation
 │   ├── day3_dj_constant.ipynb        # Deutsch-Jozsa, constant case
@@ -52,7 +60,11 @@ quantum-tamper-evident-qr/
 ├── tests/
 │   ├── test_qrng.py
 │   ├── test_dj.py
-│   ├── test_qr_io.py
+│   └── test_qr_io.py
+├── data/
+│   ├── sample_nonce.txt
+│   └── design_sketch.jpg             # Hand-sketched generate/verify flow
+├── DESIGN.md                         # Threat model, schema, flows, limitations
 ├── LEARNINGS.md                      # Daily learning log
 └── README.md
 ```
@@ -119,7 +131,8 @@ Notebooks contain histograms, circuit diagrams, and additional analysis.
 - [x] **Day 2** — 128-bit QRNG module, statistical validation
 - [x] **Day 3** — Deutsch-Jozsa circuit (constant oracles)
 - [x] **Day 4** — DJ balanced oracles, secret recovery, QR encode/decode pipeline
-- [ ] **Day 5–6** — QR payload format design
+- [x] **Day 5** — Payload schema, threat model, verify-flow design (`DESIGN.md`)
+- [ ] **Day 6** — Payload encoder/decoder utilities + HMAC tag computation
 - [ ] **Day 7–11** — Generator module: combines QRNG + DJ oracle + QR image
 - [ ] **Day 12–16** — Verifier module: reads QR and runs DJ check
 - [ ] **Day 17–18** — Execution on real IBM Quantum hardware + noise benchmarks

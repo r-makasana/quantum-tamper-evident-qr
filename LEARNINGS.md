@@ -30,4 +30,11 @@ A running log of what I learned each day building this project. Honest, conversa
 - Built the classical half too: `quantum_qr/qr_io.py`. The `qrcode` library only *encodes*; for *decoding* I used OpenCV's `cv2.QRCodeDetector` rather than `pyzbar` because pyzbar needs the zbar system binary which is painful on Windows.
 - Round-trip test passed: encode a string → PNG → decode back to the identical string. The classical pipeline is now ready to carry quantum payloads next week.
 
-## Day 5 — (tomorrow)
+## Day 5 — Design Day (no code)
+- Spent the whole day in `DESIGN.md`. No new modules, no new tests. At first it felt slow, but by the end I understood why senior engineers value design days so much — most of my Day 7+ work just got easier because the decisions are already made.
+- Wrote a real threat model before writing the schema. The eye-opener was realising that *without* a shared key, an attacker could simply recompute the tag and the whole scheme detects nothing. So this is a keyed integrity system (HMAC), and key distribution is out of scope. Writing that limitation explicitly felt better than hand-waving past it.
+- **The elegant bit:** the verifier doesn't compare hashes directly. Instead, it computes `s = tag_observed XOR tag_expected` and feeds `s` into `oracle_from_secret`. If the tags match, s = 0, DJ measures zero → authentic. If they differ, s ≠ 0, DJ measures exactly which bits disagree → tampered. A classical equality check has been re-expressed as DJ's natural constant-vs-balanced question. That's the conceptual centre of the whole project.
+- Picked **n = 8** for the tag/oracle width: 8 input qubits + 1 ancilla = 9 qubits total, comfortably runs on every free IBM Quantum backend.
+- Sketched both flows on paper first, then drew them as Mermaid diagrams. GitHub renders Mermaid in markdown automatically — looks much more professional than ASCII art.
+
+## Day 6 — (tomorrow)
