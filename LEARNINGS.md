@@ -37,4 +37,12 @@ A running log of what I learned each day building this project. Honest, conversa
 - Picked **n = 8** for the tag/oracle width: 8 input qubits + 1 ancilla = 9 qubits total, comfortably runs on every free IBM Quantum backend.
 - Sketched both flows on paper first, then drew them as Mermaid diagrams. GitHub renders Mermaid in markdown automatically — looks much more professional than ASCII art.
 
-## Day 6 — (tomorrow)
+## Day 6 — Payload Utilities + HMAC
+- Built the classical glue layer: `quantum_qr/payload.py` (compute_tag, build_payload, encode_payload, decode_payload, tags_to_secret) and `quantum_qr/config.py` for key handling.
+- **Why HMAC, not plain SHA-256:** a plain hash is keyless, so an attacker who edits the data just recomputes the hash and the tamper is invisible. HMAC folds in the secret key, so only someone who knows K can forge a valid tag. That one design choice is what makes the whole scheme actually detect anything.
+- Kept the key out of source code — `get_key()` reads `QTQR_KEY` from the environment with a clearly-labelled demo fallback. Hardcoding a key would have undercut the entire threat model.
+- **Best engineering decision so far:** I proved tamper detection works *purely classically* before wiring in any quantum. Authentic payload → tags_to_secret returns "00000000"; tampered payload → non-zero. Now the quantum layer is the only unknown left, so if DJ misbehaves next week I'll know the plumbing isn't the cause. Isolating the risky/novel component before testing it is something I want to keep doing.
+- The XOR result from `tags_to_secret` is *literally* the secret string that `oracle_from_secret` will consume next week — the two modules were designed to click together, and now they do.
+- Minor gotcha: bytes vs strings when feeding data into HMAC. Had to be deliberate about `.encode()` everywhere.
+
+## Day 7 — (tomorrow)
