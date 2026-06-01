@@ -45,4 +45,11 @@ A running log of what I learned each day building this project. Honest, conversa
 - The XOR result from `tags_to_secret` is *literally* the secret string that `oracle_from_secret` will consume next week — the two modules were designed to click together, and now they do.
 - Minor gotcha: bytes vs strings when feeding data into HMAC. Had to be deliberate about `.encode()` everywhere.
 
-## Day 7 — (tomorrow)
+## Day 7 — The Generator Comes Together
+- Built `quantum_qr/generator.py`. The `generate()` function ended up being about a dozen lines of pure orchestration: get key → quantum nonce → HMAC tag → build payload → base64 → QR image.
+- **The payoff of modular design hit me today.** Because each of the previous six days produced a clean, single-purpose interface, assembling them into a working generator was almost boring — in the best way. No fighting, no reshaping, just calling the pieces in order. This is what people mean when they say good architecture makes the integration trivial.
+- Noticed each call to `generate()` with the same message produces a *different* QR, because the nonce is freshly quantum-random every time. That's a desirable property: two identical messages don't produce identical, replayable QR codes.
+- Closed the loop: read the generated QR back, decoded it, recomputed the tag, and `tags_to_secret` returned all zeros. So the generator already produces QRs my future verifier will accept — the two halves now meet in the middle.
+- Used pytest's `tmp_path` fixture so generator tests don't litter the `data/` folder with throwaway PNGs. Small thing, but it keeps the repo clean.
+
+## Day 8 — (tomorrow)
