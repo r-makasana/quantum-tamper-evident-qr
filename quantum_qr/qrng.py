@@ -1,13 +1,9 @@
 from qiskit import QuantumCircuit
 from qiskit_aer import AerSimulator
 import matplotlib.pyplot as plt
-from qiskit import QuantumCircuit
-from qiskit_aer import AerSimulator
-import matplotlib.pyplot as plt
-# Function to generate n quantum random bits
+
 def generate_quantum_random_bits(n):
     simulator = AerSimulator()
-
     qc = QuantumCircuit(n, n)
 
     # Put all qubits in superposition
@@ -23,21 +19,33 @@ def generate_quantum_random_bits(n):
 
     print("Counts:", counts)
 
-    # Extract bitstring
+    # Extract raw bitstring
     bitstring = list(counts.keys())[0]
 
-    # Convert to list of bits (correct order)
-    bits = [int(b) for b in bitstring[::-1]]
+    # Qiskit outputs right-to-left. Reverse it for standard left-to-right reading.
+    corrected_bitstring = bitstring[::-1]
+    
+    # Convert to list of bits (integers)
+    bits = [int(b) for b in corrected_bitstring]
 
-    print(f"\n{n} Random Bits:")
+    # Convert to Hexadecimal
+    # 1. int(..., 2) translates the base-2 string into an integer.
+    # 2. hex(...) translates that integer into a hex string (e.g., '0x9fe...').
+    # 3. [2:] strips off the '0x' prefix for a clean output.
+    hex_string = hex(int(corrected_bitstring, 2))[2:]
+
+    print(f"\n{n} Random Bits (List):")
     print(bits)
+    
+    print(f"\n{n} Random Bits (Hexadecimal):")
+    print(hex_string)
 
-    # Draw circuit
-    qc.draw('mpl')
-    plt.show()
+    # # Draw circuit
+    # qc.draw('mpl')
+    # plt.show()
 
+    # You can return whatever format you need (bits, corrected_bitstring, or hex_string)
     return bits
-
 # n=int(input("Enter the number of random bits you want to generate:"))
 # # Create simulator once
 # simulator = AerSimulator()
