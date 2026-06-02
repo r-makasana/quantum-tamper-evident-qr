@@ -2,7 +2,7 @@
 
 A QR code system that uses true quantum randomness for nonce generation and the Deutsch-Jozsa algorithm for single-query tamper verification. Built with Qiskit.
 
-> **Status:** In development — Day 7 of 21 complete. The full generator is working: a single `generate()` call produces a tamper-evident QR backed by a quantum-random nonce and an HMAC tag. The quantum verifier is the next phase.
+> **Status:** In development — Day 8 of 21 complete. The generator is now robust: validated inputs, QR capacity guards, full UTF-8 support, and testable nonce injection. The quantum verifier is the next phase.
 
 ## Motivation
 
@@ -27,9 +27,11 @@ The full payload schema, threat model, generate/verify flows, and limitations ar
 ## What's working today
 
 **Generator** (`quantum_qr/generator.py`)
-- `generate(data, output_path, n_bits=8, key=None)` — one call produces a tamper-evident QR image and returns its payload metadata
+- `generate(data, output_path, n_bits=8, key=None, nonce=None)` — one call produces a tamper-evident QR image and returns its payload metadata
 - Wires together QRNG → HMAC tag → payload → QR image
-- Each call uses a fresh quantum-random nonce, so identical messages never produce identical (replayable) QRs
+- Fail-fast input validation (empty/oversized data, bad n_bits, key type, output path) with clear errors
+- Full UTF-8 payload support (emoji, accents, non-Latin scripts) verified by round-trip
+- Each call uses a fresh quantum-random nonce; optional `nonce` injection for reproducible tests/fixtures
 
 **Payload Layer** (`quantum_qr/payload.py`, `quantum_qr/config.py`)
 - `compute_tag` (HMAC-SHA256 → n bits), `build/encode/decode_payload`, `tags_to_secret` (XOR bridge to DJ)
@@ -64,7 +66,9 @@ quantum-tamper-evident-qr/
 │   ├── day3_dj_constant.ipynb
 │   ├── day4_dj_balanced_and_qr.ipynb
 │   ├── day6_payload.ipynb
-│   └── day7_generator.ipynb          # End-to-end generation demo
+│   ├── day7_generator.ipynb          # End-to-end generation demo
+│   └── day8_generator_robustness.ipynb  # Input validation and edge cases  
+     
 ├── tests/
 │   ├── test_qrng.py
 │   ├── test_dj.py
@@ -139,7 +143,7 @@ print(tags_to_secret(payload["tag"], expected))  # '00000000' = authentic
 - [x] **Day 5** — Payload schema, threat model, verify-flow design (`DESIGN.md`)
 - [x] **Day 6** — Payload encode/decode, HMAC tag, tamper bridge (classical detection working)
 - [x] **Day 7** — Core `generate()`: QRNG + HMAC + QR image end to end
-- [ ] **Day 8** — Generator robustness: input validation and edge cases
+- [x] **Day 8** — Generator robustness: input validation and edge cases
 - [ ] **Day 9** — Test-fixture generator (authentic + deliberately tampered QRs)
 - [ ] **Day 10** — Command-line interface + generator tests
 - [ ] **Day 11** — Generator polish, docstrings, QR gallery

@@ -52,4 +52,10 @@ A running log of what I learned each day building this project. Honest, conversa
 - Closed the loop: read the generated QR back, decoded it, recomputed the tag, and `tags_to_secret` returned all zeros. So the generator already produces QRs my future verifier will accept — the two halves now meet in the middle.
 - Used pytest's `tmp_path` fixture so generator tests don't litter the `data/` folder with throwaway PNGs. Small thing, but it keeps the repo clean.
 
-## Day 8 — (tomorrow)
+## Day 8 — Generator Robustness
+- Hardened `generate()` against bad input: empty data, oversized payloads, invalid n_bits, wrong key types, and missing output folders all now fail with clear messages.
+- **Key principle learned: validate before doing expensive work.** All checks run *before* the quantum nonce generation — no reason to spin up a quantum circuit for input I'm about to reject. Fail fast, fail cheap.
+- Realised "it works on the happy path" and "it's robust" are completely different bars. The gap between them is almost entirely edge-case thinking, and that's where most of today went.
+- Unicode payloads (emoji, accents, other scripts) round-trip losslessly — they "just work" because JSON handles unicode and base64 handles the resulting bytes. The layered encoding I chose on Day 5 paid off without extra effort.
+- Added an optional `nonce` injection parameter — a small example of **designing for testability**. It lets tests control otherwise-random behavior without compromising the real quantum-random default. This also sets up tomorrow's tampered-fixture work. Making the non-deterministic part injectable is a pattern I want to remember.
+- Capped n_bits at 32 because n_bits becomes the qubit count in the DJ verifier, and even 32 qubits is large for current hardware.
