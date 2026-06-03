@@ -1,0 +1,32 @@
+[
+    {
+        "file": "fixture_00_authentic.png",
+        "type": "authentic",
+        "expected_verdict": "authentic",
+        "expected_secret": "00000000"
+    },
+    {
+        "file": "fixture_01_data.png",
+        "type": "data_tampered",
+        "expected_verdict": "tampered",
+        "expected_secret": "00001010"
+    },
+    {
+        "file": "fixture_02_nonce.png",
+        "type": "nonce_tampered",
+        "expected_verdict": "tampered",
+        "expected_secret": "01010011"
+    },
+    {
+        "file": "fixture_03_tag.png",
+        "type": "tag_tampered",
+        "expected_verdict": "tampered",
+        "expected_secret": "10000000"
+    },
+    {
+        "file": "fixture_04_forged.png",
+        "type": "forged",
+        "expected_verdict": "tampered",
+        "expected_secret": "10111111"
+    }
+]
