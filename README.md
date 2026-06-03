@@ -2,7 +2,7 @@
 
 A QR code system that uses true quantum randomness for nonce generation and the Deutsch-Jozsa algorithm for single-query tamper verification. Built with Qiskit.
 
-> **Status:** In development — Day 8 of 21 complete. The generator is now robust: validated inputs, QR capacity guards, full UTF-8 support, and testable nonce injection. The quantum verifier is the next phase.
+> **Status:** In development — Day 9 of 21 complete. The generator is robust, and a labeled corpus of authentic + tampered QRs (with a ground-truth manifest) is ready to validate the quantum verifier coming next.
 
 ## Motivation
 
@@ -24,7 +24,7 @@ The full payload schema, threat model, generate/verify flows, and limitations ar
 - Authentic QR → s = 0 → constant oracle → DJ measures zeros
 - Tampered QR → s ≠ 0 → balanced oracle → DJ measures the differing bits
 
-## What's working today
+## What's working as of Day 9:
 
 **Generator** (`quantum_qr/generator.py`)
 - `generate(data, output_path, n_bits=8, key=None, nonce=None)` — one call produces a tamper-evident QR image and returns its payload metadata
@@ -48,6 +48,11 @@ The full payload schema, threat model, generate/verify flows, and limitations ar
 **Classical QR I/O** (`quantum_qr/qr_io.py`)
 - `make_qr` / `read_qr` — lossless encode/decode via `qrcode` and OpenCV
 
+**Test Fixtures** (`quantum_qr/fixtures.py`)
+- Builds a labeled corpus of authentic + tampered QRs (data/nonce/tag tampering, wrong-key forgery, corruption)
+- Writes a `manifest.json` ground-truth answer key (expected verdict + expected secret per fixture)
+- Asserts non-zero secrets for tampered cases, handling the 2^(−n_bits) collision rate explicitly
+
 ## Project structure
 
 ```
@@ -59,7 +64,9 @@ quantum-tamper-evident-qr/
 │   ├── qr_io.py                      # Classical QR encode/decode
 │   ├── payload.py                    # HMAC tag, payload encode/decode, tags-to-secret
 │   ├── config.py                     # Shared-key handling
-│   └── generator.py                  # End-to-end generate()
+│   ├── generator.py
+|   ├── fixtures.py                   # Builds the authentic + tampered QR corpus with manifest 
+|
 ├── notebooks/
 │   ├── day1_qrng.ipynb
 │   ├── day2_qrng_scaling.ipynb
@@ -67,15 +74,19 @@ quantum-tamper-evident-qr/
 │   ├── day4_dj_balanced_and_qr.ipynb
 │   ├── day6_payload.ipynb
 │   ├── day7_generator.ipynb          # End-to-end generation demo
-│   └── day8_generator_robustness.ipynb  # Input validation and edge cases  
-     
+│   ├── day8_generator_robustness.ipynb  # Input validation and edge cases  
+|    ├── day9_fixtures.ipynb            # Building the tampered-fixture corpus 
+|
 ├── tests/
 │   ├── test_qrng.py
 │   ├── test_dj.py
 │   ├── test_qr_io.py
 │   ├── test_payload.py
-│   └── test_generator.py
+│   ├── test_generator.py
+│   └── test_fixtures.py
+|
 ├── data/
+|   ├── fixtures/manifest.json        # Ground-truth answer key for the fixture corpus
 │   ├── sample_nonce.txt
 │   ├── design_sketch.jpg
 │   └── alice_payment.png             # Example generated QR
@@ -144,7 +155,7 @@ print(tags_to_secret(payload["tag"], expected))  # '00000000' = authentic
 - [x] **Day 6** — Payload encode/decode, HMAC tag, tamper bridge (classical detection working)
 - [x] **Day 7** — Core `generate()`: QRNG + HMAC + QR image end to end
 - [x] **Day 8** — Generator robustness: input validation and edge cases
-- [ ] **Day 9** — Test-fixture generator (authentic + deliberately tampered QRs)
+- [x] **Day 9** — Test-fixture generator (authentic + deliberately tampered QRs)
 - [ ] **Day 10** — Command-line interface + generator tests
 - [ ] **Day 11** — Generator polish, docstrings, QR gallery
 - [ ] **Day 12–16** — Verifier module: reads QR and runs the DJ quantum check

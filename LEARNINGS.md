@@ -59,3 +59,9 @@ A running log of what I learned each day building this project. Honest, conversa
 - Unicode payloads (emoji, accents, other scripts) round-trip losslessly — they "just work" because JSON handles unicode and base64 handles the resulting bytes. The layered encoding I chose on Day 5 paid off without extra effort.
 - Added an optional `nonce` injection parameter — a small example of **designing for testability**. It lets tests control otherwise-random behavior without compromising the real quantum-random default. This also sets up tomorrow's tampered-fixture work. Making the non-deterministic part injectable is a pattern I want to remember.
 - Capped n_bits at 32 because n_bits becomes the qubit count in the DJ verifier, and even 32 qubits is large for current hardware.
+
+## Day 9 — The Tampered-Fixture Corpus
+- Built the answer key before building the thing it grades. `quantum_qr/fixtures.py` produces authentic and deliberately tampered QRs, and `data/fixtures/manifest.json` records each one's ground-truth verdict and expected secret.
+- You genuinely can't evaluate a verifier without labeled test data. Manufacturing my own corpus — with varied, deliberate attacks (data swap, nonce swap, tag flip, wrong-key forgery, corruption) — is something I'd never have thought to do, but it's obviously how you'd validate a real security tool.
+- The 1-in-256 false-negative rate stopped being an abstract line in DESIGN.md and became code I had to handle: the builder now asserts every tampered fixture has a non-zero secret, and retries on the rare collision. The collision rate is exactly 2^(−n_bits) — a concrete reason production would use a larger tag.
+- Reused Day 8's injected-nonce seam to make every fixture reproducible. The testability hook I added "for later" turned out to be load-bearing one day later.
