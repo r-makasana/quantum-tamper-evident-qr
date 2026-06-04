@@ -6,17 +6,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from qiskit_aer import AerSimulator
 from qiskit import transpile
 
-from quantum_qr.dj import (
-    dj_circuit,
-    const_oracle_zero,
-    const_oracle_one
-)
-from quantum_qr.dj import (
-    dj_circuit,
-    balanced_oracle,
-    oracle_from_secret_string
-)
-
+from quantum_qr.dj import dj_circuit, const_oracle_zero, const_oracle_one
+from quantum_qr.dj import balanced_oracle, oracle_from_secret_string
 
 
 def run_circuit(circuit, shots=1024):
@@ -47,7 +38,7 @@ def test_constant_zero_oracle():
 
     counts = run_circuit(circuit)
 
-    assert counts == {'0000': 1024}
+    assert counts == {"0000": 1024}
 
 
 def test_constant_one_oracle():
@@ -63,7 +54,7 @@ def test_constant_one_oracle():
 
     counts = run_circuit(circuit)
 
-    assert counts == {'0000': 1024}
+    assert counts == {"0000": 1024}
 
 
 def test_dj_circuit_size():
@@ -86,6 +77,7 @@ def test_dj_circuit_size():
 
 # Test balanced oracle and secret string oracle
 
+
 def test_balanced_oracle_not_all_zeros():
     n = 4
 
@@ -95,7 +87,7 @@ def test_balanced_oracle_not_all_zeros():
     counts = run_circuit(circuit)
 
     # Should NOT be all zeros
-    assert '0000' not in counts or counts['0000'] < 1024
+    assert "0000" not in counts or counts["0000"] < 1024
 
 
 def test_secret_all_zero():
@@ -106,7 +98,7 @@ def test_secret_all_zero():
 
     counts = run_circuit(circuit)
 
-    assert counts == {'0000': 1024}
+    assert counts == {"0000": 1024}
 
 
 def test_secret_recovery_1010():
@@ -118,4 +110,4 @@ def test_secret_recovery_1010():
     counts = run_circuit(circuit)
 
     # Qiskit may reverse bit order
-    assert '1010' in counts or '0101' in counts
+    assert "1010" in counts or "0101" in counts

@@ -5,6 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from quantum_qr.qr_io import make_qr_code, read_qr_code
 
+
 def test_qr_round_trip(tmp_path):
     data = "quantum-test-123"
 
