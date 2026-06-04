@@ -65,3 +65,12 @@ A running log of what I learned each day building this project. Honest, conversa
 - You genuinely can't evaluate a verifier without labeled test data. Manufacturing my own corpus — with varied, deliberate attacks (data swap, nonce swap, tag flip, wrong-key forgery, corruption) — is something I'd never have thought to do, but it's obviously how you'd validate a real security tool.
 - The 1-in-256 false-negative rate stopped being an abstract line in DESIGN.md and became code I had to handle: the builder now asserts every tampered fixture has a non-zero secret, and retries on the rare collision. The collision rate is exactly 2^(−n_bits) — a concrete reason production would use a larger tag.
 - Reused Day 8's injected-nonce seam to make every fixture reproducible. The testability hook I added "for later" turned out to be load-bearing one day later.
+
+## Day 10 — Command-Line Interface
+- Wrapped the generator in a proper CLI: `python -m quantum_qr generate "..." -o out.png`. Needed a `cli.py` (argparse with subcommands) and a `__main__.py` to make `python -m quantum_qr` work.
+- Building a CLI forced me to think about how the tool gets *used*, not just whether it works: exit codes so it can chain in shell scripts (`... && echo ok`), a `--json` flag so other programs can capture the nonce and tag, and friendly error messages instead of dumping a stack trace at the user.
+- Designed `main(argv=None)` so tests can drive the CLI by passing an argument list directly — no subprocess spawning, no `sys.argv` monkeypatching. Same testability instinct as the injected nonce on Day 8: make the external input a parameter.
+- Used a subcommand structure (`generate` now, `verify` reserved) so next week's verifier slots in without restructuring. Designing the seam before I need it.
+- Learned the exit-code convention the hard way: argparse exits with code 2 on usage errors all on its own, so I only had to handle 0 (success) and 1 (application error like bad data).
+
+

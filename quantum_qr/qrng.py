@@ -17,7 +17,7 @@ def generate_quantum_random_bits(n):
     result = job.result()
     counts = result.get_counts()
 
-    print("Counts:", counts)
+    # print("Counts:", counts)
 
     # Extract raw bitstring
     bitstring = list(counts.keys())[0]
@@ -34,11 +34,11 @@ def generate_quantum_random_bits(n):
     # 3. [2:] strips off the '0x' prefix for a clean output.
     hex_string = hex(int(corrected_bitstring, 2))[2:]
 
-    print(f"\n{n} Random Bits (List):")
-    print(bits)
+    # print(f"\n{n} Random Bits (List):")
+    # print(bits)
     
-    print(f"\n{n} Random Bits (Hexadecimal):")
-    print(hex_string)
+    # print(f"\n{n} Random Bits (Hexadecimal):")
+    # print(hex_string)
 
     # # Draw circuit
     # qc.draw('mpl')
