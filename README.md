@@ -2,7 +2,9 @@
 
 A QR code system that uses true quantum randomness for nonce generation and the Deutsch-Jozsa algorithm for single-query tamper verification. Built with Qiskit.
 
-> **Status:** In development — Day 10 of 21 complete. The generator is feature-complete with a command-line interface. Next: polish, then the quantum verifier.
+> **Status:** In development — Day 11 of 21 complete. The generator phase is finished: a robust, documented, command-line tool producing QRs backed by a quantum-random nonce and HMAC tag, validated against a labeled fixture corpus. Next: the quantum verifier.
+
+![QR gallery — the same message produces two different codes thanks to a fresh quantum nonce each time](data/gallery.png)
 
 ## Motivation
 
@@ -24,19 +26,27 @@ The full payload schema, threat model, generate/verify flows, and limitations ar
 - Authentic QR → s = 0 → constant oracle → DJ measures zeros
 - Tampered QR → s ≠ 0 → balanced oracle → DJ measures the differing bits
 
-## What's working as of Day 10:
+## What's working today
 
 **Generator** (`quantum_qr/generator.py`)
-- `generate(data, output_path, n_bits=8, key=None, nonce=None)` — one call produces a tamper-evident QR image and returns its payload metadata
+- `generate(data, output_path, n_bits=8, key=None, nonce=None)` — one call produces a tamper-evident QR and returns its payload metadata
 - Wires together QRNG → HMAC tag → payload → QR image
-- Fail-fast input validation (empty/oversized data, bad n_bits, key type, output path) with clear errors
-- Full UTF-8 payload support (emoji, accents, non-Latin scripts) verified by round-trip
-- Each call uses a fresh quantum-random nonce; optional `nonce` injection for reproducible tests/fixtures
+- Fail-fast input validation, QR capacity guard, full UTF-8 support
+- Fresh quantum nonce per call; optional `nonce` injection for reproducible tests/fixtures
+
+**Command-Line Interface** (`quantum_qr/cli.py`, `quantum_qr/__main__.py`)
+- `python -m quantum_qr generate "<data>" -o out.png [-n 8] [--json]`
+- Friendly errors and proper exit codes (0 success / 1 application error / 2 usage)
+- Subcommand structure ready for the `verify` command in the next phase
+
+**Test Fixtures** (`quantum_qr/fixtures.py`)
+- Builds a labeled corpus of authentic + tampered QRs (data/nonce/tag tampering, wrong-key forgery, corruption)
+- Writes a `manifest.json` ground-truth answer key (expected verdict + expected secret per fixture)
+- Handles the 2^(−n_bits) collision rate explicitly
 
 **Payload Layer** (`quantum_qr/payload.py`, `quantum_qr/config.py`)
 - `compute_tag` (HMAC-SHA256 → n bits), `build/encode/decode_payload`, `tags_to_secret` (XOR bridge to DJ)
 - `get_key()` via `QTQR_KEY` env var with a documented demo fallback
-- Tamper detection verified end-to-end classically
 
 **Deutsch-Jozsa Circuit** (`quantum_qr/dj.py`)
 - `build_dj_circuit`, `constant_oracle_zero/one`, `balanced_oracle`, `oracle_from_secret(s)`
@@ -48,41 +58,32 @@ The full payload schema, threat model, generate/verify flows, and limitations ar
 **Classical QR I/O** (`quantum_qr/qr_io.py`)
 - `make_qr` / `read_qr` — lossless encode/decode via `qrcode` and OpenCV
 
-**Test Fixtures** (`quantum_qr/fixtures.py`)
-- Builds a labeled corpus of authentic + tampered QRs (data/nonce/tag tampering, wrong-key forgery, corruption)
-- Writes a `manifest.json` ground-truth answer key (expected verdict + expected secret per fixture)
-- Asserts non-zero secrets for tampered cases, handling the 2^(−n_bits) collision rate explicitly
-
-**Command-Line Interface** (`quantum_qr/cli.py`, `quantum_qr/__main__.py`)
-- `python -m quantum_qr generate "<data>" -o out.png [-n 8] [--json]`
-- Friendly errors and proper exit codes (0 success / 1 application error / 2 usage)
-- Subcommand structure ready for the `verify` command in the next phase
-
 ## Project structure
 
 ```
 quantum-tamper-evident-qr/
 ├── quantum_qr/
-│   ├── __init__.py
+│   ├── __init__.py                   # Public API + package docstring
 │   ├── qrng.py                       # Quantum random number generator
 │   ├── dj.py                         # Deutsch-Jozsa circuit + oracles
 │   ├── qr_io.py                      # Classical QR encode/decode
 │   ├── payload.py                    # HMAC tag, payload encode/decode, tags-to-secret
 │   ├── config.py                     # Shared-key handling
-│   ├── generator.py
-|   ├── fixtures.py                   # Builds the authentic + tampered QR corpus with manifest 
-|   ├── cli.py                        # argparse CLI (generate; verify reserved)
-|   └── __main__.py                   # enables `python -m quantum_qr`
+│   ├── generator.py                  # End-to-end generate()
+│   ├── fixtures.py                   # Authentic + tampered fixture builder
+│   ├── cli.py                        # argparse CLI (generate; verify reserved)
+│   └── __main__.py                   # enables `python -m quantum_qr`
 ├── notebooks/
 │   ├── day1_qrng.ipynb
 │   ├── day2_qrng_scaling.ipynb
 │   ├── day3_dj_constant.ipynb
 │   ├── day4_dj_balanced_and_qr.ipynb
 │   ├── day6_payload.ipynb
-│   ├── day7_generator.ipynb          # End-to-end generation demo
-│   ├── day8_generator_robustness.ipynb  # Input validation and edge cases  
-|   ├── day9_fixtures.ipynb            # Building the tampered-fixture corpus 
-|   ├── day10_cli.ipynb               # CLI design + terminal sessions
+│   ├── day7_generator.ipynb
+│   ├── day8_generator_robustness.ipynb
+│   ├── day9_fixtures.ipynb
+│   ├── day10_cli.ipynb
+│   └── day11_gallery.ipynb
 ├── tests/
 │   ├── test_qrng.py
 │   ├── test_dj.py
@@ -90,14 +91,16 @@ quantum-tamper-evident-qr/
 │   ├── test_payload.py
 │   ├── test_generator.py
 │   ├── test_fixtures.py
-|   ├── test_cli.py
+│   └── test_cli.py
 ├── data/
-|   ├── fixtures/manifest.json        # Ground-truth answer key for the fixture corpus
 │   ├── sample_nonce.txt
 │   ├── design_sketch.jpg
-│   └── alice_payment.png             # Example generated QR
+│   ├── gallery.png
+│   ├── alice_payment.png
+│   └── fixtures/                     # generated QR corpus + manifest.json
 ├── DESIGN.md                         # Threat model, schema, flows, limitations
 ├── LEARNINGS.md                      # Daily learning log
+├── requirements.txt
 └── README.md
 ```
 
@@ -108,15 +111,13 @@ Requires Python 3.10 or newer.
 ```bash
 git clone https://github.com/YOUR_USERNAME/quantum-tamper-evident-qr.git
 cd quantum-tamper-evident-qr
-pip install qiskit qiskit-aer qrcode[pil] opencv-python numpy matplotlib pylatexenc jupyter pytest scipy
+pip install -r requirements.txt
 ```
 
 ## Quick start
 
 ```python
-from quantum_qr.generator import generate
-from quantum_qr.payload import decode_payload, compute_tag, tags_to_secret
-from quantum_qr.qr_io import read_qr
+from quantum_qr import generate, decode_payload, compute_tag, tags_to_secret, read_qr
 from quantum_qr.config import get_key
 
 # Generate a tamper-evident QR
@@ -162,9 +163,7 @@ Exit codes: `0` success, `1` application error (e.g. empty or oversized data), `
 | `balanced_oracle`      | non-zero | 100% |
 | `oracle_from_secret("1010")` | `'1010'` (recovered) | 100% |
 
-**Classical tamper detection:** authentic → all-zeros secret; tampered → non-zero. Verified in `notebooks/day6_payload.ipynb`.
-
-**Generator:** produces verifiable QRs that round-trip to an all-zeros secret. Verified in `notebooks/day7_generator.ipynb`.
+**Classical tamper detection:** authentic → all-zeros secret; tampered → non-zero. Verified against the labeled fixture corpus.
 
 ## Roadmap
 
@@ -178,10 +177,10 @@ Exit codes: `0` success, `1` application error (e.g. empty or oversized data), `
 - [x] **Day 8** — Generator robustness: input validation and edge cases
 - [x] **Day 9** — Test-fixture generator (authentic + deliberately tampered QRs)
 - [x] **Day 10** — Command-line interface + generator tests
-- [ ] **Day 11** — Generator polish, docstrings, QR gallery
-- [ ] **Day 12–16** — Verifier module: reads QR and runs the DJ quantum check
+- [x] **Day 11** — Generator polish, docstrings, dependency pinning, QR gallery
+- [ ] **Day 12–16** — Verifier module: reads QR and runs the DJ quantum check against the fixture corpus
 - [ ] **Day 17–18** — Execution on real IBM Quantum hardware + noise benchmarks
-- [ ] **Day 19–21** — Polish, CLI, final documentation
+- [ ] **Day 19–21** — Polish, CLI verify command, final documentation
 
 ## References
 

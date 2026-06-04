@@ -73,4 +73,11 @@ A running log of what I learned each day building this project. Honest, conversa
 - Used a subcommand structure (`generate` now, `verify` reserved) so next week's verifier slots in without restructuring. Designing the seam before I need it.
 - Learned the exit-code convention the hard way: argparse exits with code 2 on usage errors all on its own, so I only had to handle 0 (success) and 1 (application error like bad data).
 
+## Day 11 — Generator Polish
+- No new features — a quality pass. Consistent Google-style docstrings and full type hints across every module, a clean public API in `__init__.py` (`from quantum_qr import generate` now works), a package docstring, and `__version__`.
+- Polish day felt low-stakes but it's exactly what makes a repo trustworthy at a glance. A reviewer judges quality in seconds from the import surface and docstring consistency, long before they read the logic.
+- Pinned dependencies in `requirements.txt` so the project actually installs for someone else — an unpinned Qiskit could pull a breaking version on a fresh clone.
+- **Best 40 minutes of the day:** the QR gallery. Generating the same message twice produces two *visibly different* QR images because each gets a fresh quantum nonce. That single picture is the strongest one-glance argument for why a quantum-random nonce matters — it makes replay resistance visible.
+- This closes the generator phase: the tool is feature-complete, robust, documented, runnable from the command line, and visually demonstrated. Everything from here is the verifier — where the quantum circuit finally does the judging.
 
+## Day 12 — (next)
