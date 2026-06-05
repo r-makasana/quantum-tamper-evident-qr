@@ -2,7 +2,7 @@
 
 A QR code system that uses true quantum randomness for nonce generation and the Deutsch-Jozsa algorithm for single-query tamper verification. Built with Qiskit.
 
-> **Status:** In development — Day 11 of 21 complete. The generator phase is finished: a robust, documented, command-line tool producing QRs backed by a quantum-random nonce and HMAC tag, validated against a labeled fixture corpus. Next: the quantum verifier.
+> **Status:** In development — Day 12 of 21 complete. Both halves now exist: a generator that issues tamper-evident QRs and a Deutsch-Jozsa verifier that judges them on a simulator. Next: corpus-wide accuracy, then real quantum hardware.
 
 ![QR gallery — the same message produces two different codes thanks to a fresh quantum nonce each time](data/gallery.png)
 
@@ -13,7 +13,7 @@ Standard QR codes are vulnerable to physical swap attacks (common in payment fra
 - **True randomness** — Nonces come from quantum measurements (Hadamard + measure), not pseudo-random functions, so they cannot be reproduced from a seed.
 - **Single-query verification** — A Deutsch-Jozsa oracle lets a verifier detect tampering in one quantum query: untampered → constant oracle → measures all zeros; tampered → balanced oracle → measures non-zero.
 
-This is primarily a learning and engineering exploration. A classical HMAC achieves tamper detection with less complexity; the value here is in implementing real quantum algorithms end-to-end and running them on actual quantum hardware.
+This is primarily a learning and engineering exploration. A classical HMAC achieves tamper detection with less complexity; the value here is in implementing real quantum algorithms end-to-end and quantifying how reliably they run on actual quantum hardware. The verifier's verdict is driven by the quantum measurement; on a noiseless simulator it round-trips by construction, and its robustness becomes a measured quantity on noisy hardware (see Roadmap, Days 17–18).
 
 ## Design
 
@@ -28,29 +28,28 @@ The full payload schema, threat model, generate/verify flows, and limitations ar
 
 ## What's working today
 
+**Verifier** (`quantum_qr/verifier.py`)
+- `verify(qr_path, n_bits=8, key=None, shots=1024)` — reads a QR, runs the DJ tamper check, returns a verdict dict
+- Verdict (`authentic`/`tampered`) is driven by the quantum measurement
+- Returns the measured secret, the classical secret, an `agree` correctness flag, and the full histogram
+- Wrong key correctly flags an authentic QR as tampered (the key is load-bearing)
+
 **Generator** (`quantum_qr/generator.py`)
 - `generate(data, output_path, n_bits=8, key=None, nonce=None)` — one call produces a tamper-evident QR and returns its payload metadata
-- Wires together QRNG → HMAC tag → payload → QR image
-- Fail-fast input validation, QR capacity guard, full UTF-8 support
-- Fresh quantum nonce per call; optional `nonce` injection for reproducible tests/fixtures
+- Fail-fast validation, QR capacity guard, full UTF-8 support, fresh quantum nonce per call
 
 **Command-Line Interface** (`quantum_qr/cli.py`, `quantum_qr/__main__.py`)
 - `python -m quantum_qr generate "<data>" -o out.png [-n 8] [--json]`
-- Friendly errors and proper exit codes (0 success / 1 application error / 2 usage)
-- Subcommand structure ready for the `verify` command in the next phase
+- Friendly errors and proper exit codes; `verify` subcommand arriving in Day 15
 
 **Test Fixtures** (`quantum_qr/fixtures.py`)
-- Builds a labeled corpus of authentic + tampered QRs (data/nonce/tag tampering, wrong-key forgery, corruption)
-- Writes a `manifest.json` ground-truth answer key (expected verdict + expected secret per fixture)
-- Handles the 2^(−n_bits) collision rate explicitly
+- Labeled corpus of authentic + tampered QRs with a `manifest.json` ground-truth answer key
 
 **Payload Layer** (`quantum_qr/payload.py`, `quantum_qr/config.py`)
-- `compute_tag` (HMAC-SHA256 → n bits), `build/encode/decode_payload`, `tags_to_secret` (XOR bridge to DJ)
-- `get_key()` via `QTQR_KEY` env var with a documented demo fallback
+- `compute_tag`, `build/encode/decode_payload`, `tags_to_secret`, `get_key()` (via `QTQR_KEY` env var)
 
 **Deutsch-Jozsa Circuit** (`quantum_qr/dj.py`)
-- `build_dj_circuit`, `constant_oracle_zero/one`, `balanced_oracle`, `oracle_from_secret(s)`
-- `oracle_from_secret` unifies constant/balanced and recovers s in one query (Bernstein-Vazirani behavior)
+- `build_dj_circuit`, `constant_oracle_zero/one`, `balanced_oracle`, `oracle_from_secret(s)` (recovers s in one query — Bernstein-Vazirani behavior)
 
 **Quantum RNG** (`quantum_qr/qrng.py`)
 - 128-qubit Hadamard circuit; binary/hex nonces; chi-square validated (p = 0.XX)  ← *replace with your value*
@@ -70,8 +69,9 @@ quantum-tamper-evident-qr/
 │   ├── payload.py                    # HMAC tag, payload encode/decode, tags-to-secret
 │   ├── config.py                     # Shared-key handling
 │   ├── generator.py                  # End-to-end generate()
+│   ├── verifier.py                   # DJ-based verify()
 │   ├── fixtures.py                   # Authentic + tampered fixture builder
-│   ├── cli.py                        # argparse CLI (generate; verify reserved)
+│   ├── cli.py                        # argparse CLI (generate; verify in Day 15)
 │   └── __main__.py                   # enables `python -m quantum_qr`
 ├── notebooks/
 │   ├── day1_qrng.ipynb
@@ -83,7 +83,8 @@ quantum-tamper-evident-qr/
 │   ├── day8_generator_robustness.ipynb
 │   ├── day9_fixtures.ipynb
 │   ├── day10_cli.ipynb
-│   └── day11_gallery.ipynb
+│   ├── day11_gallery.ipynb
+│   └── day12_verifier.ipynb
 ├── tests/
 │   ├── test_qrng.py
 │   ├── test_dj.py
@@ -91,7 +92,8 @@ quantum-tamper-evident-qr/
 │   ├── test_payload.py
 │   ├── test_generator.py
 │   ├── test_fixtures.py
-│   └── test_cli.py
+│   ├── test_cli.py
+│   └── test_verifier.py
 ├── data/
 │   ├── sample_nonce.txt
 │   ├── design_sketch.jpg
@@ -117,17 +119,19 @@ pip install -r requirements.txt
 ## Quick start
 
 ```python
-from quantum_qr import generate, decode_payload, compute_tag, tags_to_secret, read_qr
-from quantum_qr.config import get_key
+from quantum_qr import generate
+from quantum_qr.verifier import verify
 
-# Generate a tamper-evident QR
-result = generate("pay alice $10", "data/alice_payment.png")
-print(result["payload"])   # {version, data, nonce, tag}
+# Issue a tamper-evident QR
+generate("pay alice $10", "data/alice_payment.png")
 
-# Verify (classical half — quantum DJ check arrives in the next phase)
-payload = decode_payload(read_qr("data/alice_payment.png"))
-expected = compute_tag(get_key(), payload["data"], payload["nonce"], n_bits=8)
-print(tags_to_secret(payload["tag"], expected))  # '00000000' = authentic
+# Verify it with the quantum (Deutsch-Jozsa) check
+result = verify("data/alice_payment.png")
+print(result["verdict"])          # 'authentic'
+print(result["agree"])            # True  (quantum measurement matches classical secret)
+
+# A tampered fixture verifies as tampered
+print(verify("data/fixtures/fixture_01_data.png")["verdict"])  # 'tampered'
 ```
 
 ## Command-line usage
@@ -138,12 +142,9 @@ python -m quantum_qr generate "pay alice $10" -o data/alice.png
 
 # Machine-readable output for scripting
 python -m quantum_qr generate "pay alice $10" -o data/alice.png --json
-
-# Custom tag width
-python -m quantum_qr generate "hello" -o data/hello.png -n 8
 ```
 
-Exit codes: `0` success, `1` application error (e.g. empty or oversized data), `2` usage error.
+Exit codes: `0` success, `1` application error, `2` usage error. (A `verify` subcommand lands on Day 15.)
 
 ## Validation results
 
@@ -163,7 +164,7 @@ Exit codes: `0` success, `1` application error (e.g. empty or oversized data), `
 | `balanced_oracle`      | non-zero | 100% |
 | `oracle_from_secret("1010")` | `'1010'` (recovered) | 100% |
 
-**Classical tamper detection:** authentic → all-zeros secret; tampered → non-zero. Verified against the labeled fixture corpus.
+**Verifier** (`aer_simulator`): authentic QRs → `authentic`; tampered fixtures → `tampered`; DJ-measured secret matches the classical secret 100% of the time (`agree = True`). Corpus-wide accuracy numbers land on Day 13.
 
 ## Roadmap
 
@@ -172,15 +173,19 @@ Exit codes: `0` success, `1` application error (e.g. empty or oversized data), `
 - [x] **Day 3** — Deutsch-Jozsa circuit (constant oracles)
 - [x] **Day 4** — DJ balanced oracles, secret recovery, QR encode/decode pipeline
 - [x] **Day 5** — Payload schema, threat model, verify-flow design (`DESIGN.md`)
-- [x] **Day 6** — Payload encode/decode, HMAC tag, tamper bridge (classical detection working)
+- [x] **Day 6** — Payload encode/decode, HMAC tag, tamper bridge
 - [x] **Day 7** — Core `generate()`: QRNG + HMAC + QR image end to end
 - [x] **Day 8** — Generator robustness: input validation and edge cases
 - [x] **Day 9** — Test-fixture generator (authentic + deliberately tampered QRs)
 - [x] **Day 10** — Command-line interface + generator tests
 - [x] **Day 11** — Generator polish, docstrings, dependency pinning, QR gallery
-- [ ] **Day 12–16** — Verifier module: reads QR and runs the DJ quantum check against the fixture corpus
+- [x] **Day 12** — Core DJ-based `verify()` on the simulator
+- [ ] **Day 13** — Verifier accuracy across the full fixture corpus
+- [ ] **Day 14** — Probabilistic handling: shots, majority voting, confidence thresholds
+- [ ] **Day 15** — `verify` CLI subcommand + verifier tests
+- [ ] **Day 16** — Verifier polish + accuracy/confusion-matrix visual
 - [ ] **Day 17–18** — Execution on real IBM Quantum hardware + noise benchmarks
-- [ ] **Day 19–21** — Polish, CLI verify command, final documentation
+- [ ] **Day 19–21** — Final polish, full CLI, documentation
 
 ## References
 

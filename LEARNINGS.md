@@ -80,4 +80,9 @@ A running log of what I learned each day building this project. Honest, conversa
 - **Best 40 minutes of the day:** the QR gallery. Generating the same message twice produces two *visibly different* QR images because each gets a fresh quantum nonce. That single picture is the strongest one-glance argument for why a quantum-random nonce matters — it makes replay resistance visible.
 - This closes the generator phase: the tool is feature-complete, robust, documented, runnable from the command line, and visually demonstrated. Everything from here is the verifier — where the quantum circuit finally does the judging.
 
-## Day 12 — (next)
+## Day 12 — The Quantum Verifier
+- Built `quantum_qr/verifier.py`. `verify()` reads a QR, recomputes the expected tag, derives the secret, builds the DJ circuit from it, runs it on the simulator, and returns a verdict driven by the quantum measurement. The system now makes an authentic-vs-tampered decision.
+- **The most important realisation of the whole project:** the DJ verifier round-trips perfectly on a simulator because building the oracle requires the very secret that DJ then recovers. I stopped seeing that as a flaw and started seeing it as the honest truth of the project — the quantum step is *demonstrative* on a noiseless simulator, and its robustness only becomes a real, measurable quantity on noisy hardware (Days 17–18). Being able to say that clearly is worth more than pretending the quantum part does something a classical check couldn't.
+- Added an `agree` field comparing the DJ-measured secret to the classically-derived one. On the simulator it's `True` every time, which is a built-in correctness check on the circuit construction.
+- Bit ordering bit me again, exactly where I expected — the measured secret came out reversed relative to the manifest until I applied the convention consistently. Glad I documented it on Day 2.
+- Wrote a test proving that verifying with the *wrong* key flags an authentic QR as tampered. That's the security property made concrete: without the shared key, verification fails. The key is load-bearing, not decorative.
