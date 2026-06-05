@@ -64,11 +64,15 @@ def evaluate_corpus(fixtures_dir: str, manifest_path: str, key: Optional[bytes] 
 
         # Record detail
         per_fixture_results.append({
-            "filename": filename,
-            "type": tamper_type,
-            "expected_verdict": expected_verdict,
-            "predicted_verdict": predicted_verdict,
-            "is_correct": is_correct
+        "filename": filename,
+        "expected_verdict": expected_verdict,
+        "predicted_verdict": predicted_verdict,
+        "expected_secret": expected_secret,
+        "measured_secret": result.get("measured_secret"),
+        "confidence": result.get("confidence"), # Add this
+        "p_zeros": result.get("p_zeros"),       # Add this
+        "is_correct": is_correct,
+        "reason": result.get("reason")
         })
 
     # 5. Calculate final InfoSec metrics safely (preventing division by zero)

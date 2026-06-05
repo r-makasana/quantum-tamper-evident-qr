@@ -100,3 +100,28 @@ def test_verify_invalid_qr(tmp_path):
     assert "reason" in result
     assert result["agree"] is False
     assert result["measured_secret"] is None
+
+from quantum_qr.verifier import decide
+
+def test_decide_logic():
+    # 1. Clear Authentic
+    res1 = decide({"00000000": 1000}, n_bits=8)
+    assert res1["verdict"] == "authentic"
+    assert res1["confidence"] == 1.0
+
+    # 2. Clear Tampered
+    res2 = decide({"10110010": 1000}, n_bits=8)
+    assert res2["verdict"] == "tampered"
+
+    # 3. Threshold sensitivity (p_zeros = 0.6)
+    counts = {"00000000": 600, "11111111": 400}
+    # Pass at 0.5 threshold
+    assert decide(counts, 8, accept_threshold=0.5)["verdict"] == "authentic"
+    # Fail at 0.7 threshold
+    assert decide(counts, 8, accept_threshold=0.7)["verdict"] == "tampered"
+
+    # 4. Confidence floor
+    # A flat distribution with low confidence
+    flat_counts = {"00000000": 250, "11111111": 250, "01010101": 250, "10101010": 250}
+    res4 = decide(flat_counts, 8, confidence_floor=0.3)
+    assert res4["verdict"] == "inconclusive"
