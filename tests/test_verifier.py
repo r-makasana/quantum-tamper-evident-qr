@@ -1,6 +1,7 @@
 import os
 import json
 import pytest
+import qrcode
 
 from quantum_qr.generator import generate
 from quantum_qr.verifier import verify
@@ -82,3 +83,20 @@ def test_verify_wrong_key(tmp_path):
     # Even though it's "tampered", the simulator should still perfectly read 
     # the non-zero secret created by the mismatched tags.
     assert result["agree"] is True
+
+def test_verify_invalid_qr(tmp_path):
+    """Verify that a corrupted or undecodable QR returns an 'invalid' verdict."""
+    qr_path = str(tmp_path / "garbage_qr.png")
+    
+    # Create a perfectly valid image, but with a garbage payload
+    img = qrcode.make("This is definitely not a base64 encoded JSON string!")
+    img.save(qr_path)
+    
+    # Verify it
+    result = verify(qr_path)
+    
+    # Assertions
+    assert result["verdict"] == "invalid"
+    assert "reason" in result
+    assert result["agree"] is False
+    assert result["measured_secret"] is None

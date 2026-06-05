@@ -1,0 +1,73 @@
+{
+    "metrics": {
+        "total": 5,
+        "accuracy": 1.0,
+        "recall": 1.0,
+        "precision": 1.0
+    },
+    "confusion_matrix": {
+        "TP": 4,
+        "TN": 1,
+        "FP": 0,
+        "FN": 0
+    },
+    "breakdown": {
+        "data_tampered": {
+            "total": 1,
+            "caught": 1,
+            "recall": 1.0
+        },
+        "nonce_tampered": {
+            "total": 1,
+            "caught": 1,
+            "recall": 1.0
+        },
+        "tag_tampered": {
+            "total": 1,
+            "caught": 1,
+            "recall": 1.0
+        },
+        "forged": {
+            "total": 1,
+            "caught": 1,
+            "recall": 1.0
+        }
+    },
+    "details": [
+        {
+            "filename": "fixture_00_authentic.png",
+            "type": "authentic",
+            "expected_verdict": "authentic",
+            "predicted_verdict": "authentic",
+            "is_correct": true
+        },
+        {
+            "filename": "fixture_01_data.png",
+            "type": "data_tampered",
+            "expected_verdict": "tampered",
+            "predicted_verdict": "tampered",
+            "is_correct": true
+        },
+        {
+            "filename": "fixture_02_nonce.png",
+            "type": "nonce_tampered",
+            "expected_verdict": "tampered",
+            "predicted_verdict": "tampered",
+            "is_correct": true
+        },
+        {
+            "filename": "fixture_03_tag.png",
+            "type": "tag_tampered",
+            "expected_verdict": "tampered",
+            "predicted_verdict": "tampered",
+            "is_correct": true
+        },
+        {
+            "filename": "fixture_04_forged.png",
+            "type": "forged",
+            "expected_verdict": "tampered",
+            "predicted_verdict": "tampered",
+            "is_correct": true
+        }
+    ]
+}

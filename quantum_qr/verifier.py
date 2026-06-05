@@ -11,15 +11,27 @@ from quantum_qr.dj import oracle_from_secret_string, dj_circuit
 def verify(qr_path: str, n_bits: int = 8, key: Optional[bytes] = None, shots: int = 1024) -> dict:
     """Read a QR, run the DJ tamper check, and return a verdict dict."""
     
-    # 1. Read and decode the payload
-    b64_payload = read_qr_code(qr_path)
-    decoded = decode_payload(b64_payload)
-    
-    data = decoded['data']
-    nonce = decoded['nonce']
-    tag_observed = decoded['tag']
-    
-    # 2. Resolve the key
+    # 1. Safely attempt to read and decode the payload
+    try:
+        b64_payload = read_qr_code(qr_path)
+        decoded = decode_payload(b64_payload)
+        
+        data = decoded['data']
+        nonce = decoded['nonce']
+        tag_observed = decoded['tag']
+    except Exception as e:
+        # Catch any failure: file missing, bad base64, missing JSON keys, etc.
+        return {
+            "verdict": "invalid",
+            "reason": f"Decode failure: {str(e)}",
+            "measured_secret": None,
+            "classical_secret": None,
+            "agree": False,
+            "data": None,
+            "counts": None
+        }
+        
+    # 2. Resolve the key (The rest of your function remains exactly the same below this!)
     if key is None:
         key = get_key()
         
