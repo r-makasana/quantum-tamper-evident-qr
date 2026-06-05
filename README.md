@@ -2,7 +2,7 @@
 
 A QR code system that uses true quantum randomness for nonce generation and the Deutsch-Jozsa algorithm for single-query tamper verification. Built with Qiskit.
 
-> **Status:** In development — Day 12 of 21 complete. Both halves now exist: a generator that issues tamper-evident QRs and a Deutsch-Jozsa verifier that judges them on a simulator. Next: corpus-wide accuracy, then real quantum hardware.
+> **Status:** In development — Day 14 of 21 complete. End-to-end pipeline works on the simulator: generate → verify, scored across a labeled corpus, with a noise-robust decision rule. Next: CLI verify command, then real quantum hardware.
 
 ![QR gallery — the same message produces two different codes thanks to a fresh quantum nonce each time](data/gallery.png)
 
@@ -13,7 +13,7 @@ Standard QR codes are vulnerable to physical swap attacks (common in payment fra
 - **True randomness** — Nonces come from quantum measurements (Hadamard + measure), not pseudo-random functions, so they cannot be reproduced from a seed.
 - **Single-query verification** — A Deutsch-Jozsa oracle lets a verifier detect tampering in one quantum query: untampered → constant oracle → measures all zeros; tampered → balanced oracle → measures non-zero.
 
-This is primarily a learning and engineering exploration. A classical HMAC achieves tamper detection with less complexity; the value here is in implementing real quantum algorithms end-to-end and quantifying how reliably they run on actual quantum hardware. The verifier's verdict is driven by the quantum measurement; on a noiseless simulator it round-trips by construction, and its robustness becomes a measured quantity on noisy hardware (see Roadmap, Days 17–18).
+This is primarily a learning and engineering exploration. A classical HMAC achieves tamper detection with less complexity; the value here is in implementing real quantum algorithms end-to-end and quantifying how reliably they run on actual quantum hardware. The verifier's verdict is driven by the quantum measurement; on a noiseless simulator it round-trips by construction, and its robustness becomes a measured quantity under noise (see the noise sweep below and Roadmap Days 17–18).
 
 ## Design
 
@@ -29,10 +29,16 @@ The full payload schema, threat model, generate/verify flows, and limitations ar
 ## What's working today
 
 **Verifier** (`quantum_qr/verifier.py`)
-- `verify(qr_path, n_bits=8, key=None, shots=1024)` — reads a QR, runs the DJ tamper check, returns a verdict dict
-- Verdict (`authentic`/`tampered`) is driven by the quantum measurement
-- Returns the measured secret, the classical secret, an `agree` correctness flag, and the full histogram
+- `verify(qr_path, n_bits=8, key=None, shots=1024, accept_threshold=0.5, confidence_floor=0.0)` — reads a QR, runs the DJ tamper check, returns a verdict dict
+- Verdicts: `authentic`, `tampered`, `invalid` (undecodable QR — never crashes)
+- `decide(counts, ...)` — pure decision function separating quantum execution from verdict logic; returns verdict, `confidence`, `p_zeros`, `measured_secret`
+- Noise-robust via an accept threshold on P(zeros) and an "inconclusive" confidence floor
 - Wrong key correctly flags an authentic QR as tampered (the key is load-bearing)
+
+**Evaluation Harness** (`quantum_qr/evaluate.py`)
+- `evaluate_corpus(fixtures_dir, manifest_path, ...)` — scores `verify()` across the labeled corpus
+- Reports accuracy, **recall** (security-critical), precision, a confusion matrix, and a per-tamper-type breakdown
+- Records per-fixture confidence; simulator baseline saved to `data/eval_simulator.json`
 
 **Generator** (`quantum_qr/generator.py`)
 - `generate(data, output_path, n_bits=8, key=None, nonce=None)` — one call produces a tamper-evident QR and returns its payload metadata
@@ -40,7 +46,7 @@ The full payload schema, threat model, generate/verify flows, and limitations ar
 
 **Command-Line Interface** (`quantum_qr/cli.py`, `quantum_qr/__main__.py`)
 - `python -m quantum_qr generate "<data>" -o out.png [-n 8] [--json]`
-- Friendly errors and proper exit codes; `verify` subcommand arriving in Day 15
+- Friendly errors and proper exit codes; `verify` subcommand arriving on Day 15
 
 **Test Fixtures** (`quantum_qr/fixtures.py`)
 - Labeled corpus of authentic + tampered QRs with a `manifest.json` ground-truth answer key
@@ -69,7 +75,8 @@ quantum-tamper-evident-qr/
 │   ├── payload.py                    # HMAC tag, payload encode/decode, tags-to-secret
 │   ├── config.py                     # Shared-key handling
 │   ├── generator.py                  # End-to-end generate()
-│   ├── verifier.py                   # DJ-based verify()
+│   ├── verifier.py                   # DJ-based verify() + decide()
+│   ├── evaluate.py                   # Corpus evaluation harness
 │   ├── fixtures.py                   # Authentic + tampered fixture builder
 │   ├── cli.py                        # argparse CLI (generate; verify in Day 15)
 │   └── __main__.py                   # enables `python -m quantum_qr`
@@ -84,7 +91,9 @@ quantum-tamper-evident-qr/
 │   ├── day9_fixtures.ipynb
 │   ├── day10_cli.ipynb
 │   ├── day11_gallery.ipynb
-│   └── day12_verifier.ipynb
+│   ├── day12_verifier.ipynb
+│   ├── day13_accuracy.ipynb
+│   └── day14_decision_rule.ipynb
 ├── tests/
 │   ├── test_qrng.py
 │   ├── test_dj.py
@@ -93,12 +102,15 @@ quantum-tamper-evident-qr/
 │   ├── test_generator.py
 │   ├── test_fixtures.py
 │   ├── test_cli.py
-│   └── test_verifier.py
+│   ├── test_verifier.py
+│   └── test_evaluate.py
 ├── data/
 │   ├── sample_nonce.txt
 │   ├── design_sketch.jpg
 │   ├── gallery.png
+│   ├── noise_sweep.png
 │   ├── alice_payment.png
+│   ├── eval_simulator.json           # frozen simulator baseline
 │   └── fixtures/                     # generated QR corpus + manifest.json
 ├── DESIGN.md                         # Threat model, schema, flows, limitations
 ├── LEARNINGS.md                      # Daily learning log
@@ -127,8 +139,8 @@ generate("pay alice $10", "data/alice_payment.png")
 
 # Verify it with the quantum (Deutsch-Jozsa) check
 result = verify("data/alice_payment.png")
-print(result["verdict"])          # 'authentic'
-print(result["agree"])            # True  (quantum measurement matches classical secret)
+print(result["verdict"])       # 'authentic'
+print(result["confidence"])    # ~1.0 on the simulator
 
 # A tampered fixture verifies as tampered
 print(verify("data/fixtures/fixture_01_data.png")["verdict"])  # 'tampered'
@@ -137,10 +149,7 @@ print(verify("data/fixtures/fixture_01_data.png")["verdict"])  # 'tampered'
 ## Command-line usage
 
 ```bash
-# Generate a tamper-evident QR
 python -m quantum_qr generate "pay alice $10" -o data/alice.png
-
-# Machine-readable output for scripting
 python -m quantum_qr generate "pay alice $10" -o data/alice.png --json
 ```
 
@@ -164,7 +173,11 @@ Exit codes: `0` success, `1` application error, `2` usage error. (A `verify` sub
 | `balanced_oracle`      | non-zero | 100% |
 | `oracle_from_secret("1010")` | `'1010'` (recovered) | 100% |
 
-**Verifier** (`aer_simulator`): authentic QRs → `authentic`; tampered fixtures → `tampered`; DJ-measured secret matches the classical secret 100% of the time (`agree = True`). Corpus-wide accuracy numbers land on Day 13.
+**Verifier accuracy** (simulator, full fixture corpus): accuracy 100%, recall 100%, zero off-diagonal confusion entries. Expected on a noiseless backend — it validates the pipeline and corpus consistency. The meaningful accuracy test is on noisy hardware (Days 17–18), measured with this same harness. Baseline frozen in `data/eval_simulator.json`.
+
+**Noise tolerance:** under a simulated depolarizing noise model, the authentic verdict's `P(zeros)` decays from 1.0 as noise rises while tampered stays near 0 — the gap between them, relative to the accept threshold, is the verifier's noise budget.
+
+![Verifier robustness: P(zeros) for authentic vs tampered QRs against depolarizing noise, with the accept threshold](data/noise_sweep.png)
 
 ## Roadmap
 
@@ -180,8 +193,8 @@ Exit codes: `0` success, `1` application error, `2` usage error. (A `verify` sub
 - [x] **Day 10** — Command-line interface + generator tests
 - [x] **Day 11** — Generator polish, docstrings, dependency pinning, QR gallery
 - [x] **Day 12** — Core DJ-based `verify()` on the simulator
-- [ ] **Day 13** — Verifier accuracy across the full fixture corpus
-- [ ] **Day 14** — Probabilistic handling: shots, majority voting, confidence thresholds
+- [x] **Day 13** — Verifier accuracy across the full fixture corpus
+- [x] **Day 14** — Probabilistic decision rule, noise simulation, threshold sweep
 - [ ] **Day 15** — `verify` CLI subcommand + verifier tests
 - [ ] **Day 16** — Verifier polish + accuracy/confusion-matrix visual
 - [ ] **Day 17–18** — Execution on real IBM Quantum hardware + noise benchmarks

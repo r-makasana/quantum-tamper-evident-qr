@@ -86,3 +86,19 @@ A running log of what I learned each day building this project. Honest, conversa
 - Added an `agree` field comparing the DJ-measured secret to the classically-derived one. On the simulator it's `True` every time, which is a built-in correctness check on the circuit construction.
 - Bit ordering bit me again, exactly where I expected — the measured secret came out reversed relative to the manifest until I applied the convention consistently. Glad I documented it on Day 2.
 - Wrote a test proving that verifying with the *wrong* key flags an authentic QR as tampered. That's the security property made concrete: without the shared key, verification fails. The key is load-bearing, not decorative.
+
+## Day 13 — Corpus Evaluation Harness
+- Built `quantum_qr/evaluate.py`. `evaluate_corpus()` runs `verify()` across the whole labeled corpus and scores it against the manifest — accuracy, recall, precision, a confusion matrix, and a per-tamper-type breakdown.
+- Framed tamper detection as a binary classifier where **recall is the metric that matters**, because a false negative means accepting a forgery — far worse than a false positive (rejecting a real QR). Saying which error is worse, and why, is part of taking a security tool seriously.
+- Got 100% on the simulator, and made myself write down honestly what that does and doesn't mean: it confirms the corpus, the integration, and the bit-ordering are all consistent. It is **not** evidence that quantum adds detection power — on a noiseless simulator the DJ readout matches the classical secret by construction. The real accuracy test is on noisy hardware.
+- Hardened `verify()` to return `"invalid"` (rather than crash) on undecodable/corrupted QRs. A real verifier must never throw on malformed input — an unparseable QR is simply not authentic.
+- Froze the simulator result to `data/eval_simulator.json` as a baseline, so the Day 18 hardware run becomes a clean before/after comparison.
+
+## Day 14 — Probabilistic Decision Rule + Noise
+- Separated `decide()` (a pure function: counts histogram → verdict) from the quantum execution. Now I can unit-test the decision logic with hand-built distributions and no circuits at all — the cleanest seam I've added yet.
+- Added an accept threshold on `P(zeros)` and an "inconclusive" confidence floor. On a noiseless simulator the verdict is unchanged (P(zeros) is exactly 1.0 or 0.0), but these become essential the moment hardware noise spreads the outcomes.
+- Simulated depolarizing noise with `qiskit-aer` and watched the clean DJ peak smear out as noise rose. That made the threshold and the inconclusive band feel *necessary* rather than arbitrary.
+- The noise sweep plot (`data/noise_sweep.png`) is the first piece of analysis in this whole project that a classical HMAC simply couldn't produce — it's genuinely about quantum execution behaviour. Authentic `P(zeros)` starts at 1.0 and decays; tampered stays near 0; the threshold line shows the noise budget the verifier tolerates.
+- **Debugging lesson of the day:** my first sweep plot had both curves flat at zero. The tell was the noiseless endpoint — at p=0 the authentic curve *must* be 1.0, so a flat-zero authentic curve is a bug, not physics. The cause was the ancilla sneaking into the measurement register, so my `"0"*n_bits` lookup never matched the longer counts keys. **Always sanity-check the value you already know before trusting the rest of the curve.**
+
+## Day 15 — (next)
