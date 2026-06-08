@@ -46,7 +46,7 @@ def handle_verify(args: argparse.Namespace) -> int:
             args.qr_path,
             n_bits=args.bits,
             shots=args.shots,
-            accept_threshold=args.threshold
+            accept_threshold=args.threshold,
         )
     except Exception as e:
         print(f"Operational error during verification: {e}", file=sys.stderr)
@@ -58,21 +58,23 @@ def handle_verify(args: argparse.Namespace) -> int:
         print(json.dumps(result, indent=2))
     else:
         # Human-friendly diagnostic output
-        verdict = result.get('verdict', 'unknown').upper()
+        verdict = result.get("verdict", "unknown").upper()
         print(f"VERDICT: {verdict}")
-        
+
         if verdict in ["AUTHENTIC", "TAMPERED"]:
             print(f"confidence: {result.get('confidence', 0.0):.2f}")
             print(f"P(zeros):   {result.get('p_zeros', 0.0):.2f}")
-            
+
         if verdict == "TAMPERED":
             measured = result.get("measured_secret", "")
             if measured:
                 # DJ expects all 0s. Find indices where measured bit is '1'
-                diff_bits = [str(i) for i, bit in enumerate(measured) if bit == '1']
+                diff_bits = [str(i) for i, bit in enumerate(measured) if bit == "1"]
                 diff_str = ",".join(diff_bits)
-                print(f"measured secret: {measured}   (bits {diff_str} differ from expected)")
-                
+                print(
+                    f"measured secret: {measured}   (bits {diff_str} differ from expected)"
+                )
+
         elif verdict == "INVALID":
             print(f"reason: {result.get('reason')}")
 
@@ -111,30 +113,46 @@ def main(argv: list[str] | None = None) -> int:
         "-o", "--output", required=True, help="Filepath to save the generated QR image"
     )
     gen_parser.add_argument(
-        "-n", "--bits", type=int, default=8, help="Number of bits for the HMAC truncation and quantum register (default: 8)"
+        "-n",
+        "--bits",
+        type=int,
+        default=8,
+        help="Number of bits for the HMAC truncation and quantum register (default: 8)",
     )
     gen_parser.add_argument(
-        "--json", action="store_true", help="Output machine-readable JSON to stdout instead of standard text"
+        "--json",
+        action="store_true",
+        help="Output machine-readable JSON to stdout instead of standard text",
     )
 
     # --- Verify Command ---
     verify_parser = subparsers.add_parser(
         "verify", help="Verify a quantum tamper-evident QR code"
     )
+    verify_parser.add_argument("qr_path", type=str, help="Path to the QR code image")
     verify_parser.add_argument(
-        "qr_path", type=str, help="Path to the QR code image"
+        "--shots",
+        type=int,
+        default=1024,
+        help="Number of quantum shots (default: 1024)",
     )
     verify_parser.add_argument(
-        "--shots", type=int, default=1024, help="Number of quantum shots (default: 1024)"
+        "--threshold",
+        type=float,
+        default=0.5,
+        help="P(zeros) acceptance threshold (default: 0.5)",
     )
     verify_parser.add_argument(
-        "--threshold", type=float, default=0.5, help="P(zeros) acceptance threshold (default: 0.5)"
+        "-n",
+        "--bits",
+        type=int,
+        default=8,
+        help="Number of bits in the secret (default: 8)",
     )
     verify_parser.add_argument(
-        "-n", "--bits", type=int, default=8, help="Number of bits in the secret (default: 8)"
-    )
-    verify_parser.add_argument(
-        "--json", action="store_true", help="Output machine-readable JSON to stdout instead of standard text"
+        "--json",
+        action="store_true",
+        help="Output machine-readable JSON to stdout instead of standard text",
     )
 
     args = parser.parse_args(argv)
