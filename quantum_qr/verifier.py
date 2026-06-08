@@ -1,19 +1,53 @@
 """
 Quantum verification engine for Tamper-Evident QR codes.
 
-This module orchestrates the reading, decoding, and quantum simulation necessary
-to verify a payload's authenticity using the Deutsch-Jozsa algorithm.
+This module orchestrates the reading, decoding, and quantum simulation/execution
+necessary to verify a payload's authenticity using the Deutsch-Jozsa algorithm.
 """
 
 from typing import Optional, Dict, Any
-from qiskit import transpile
+from qiskit import transpile, QuantumCircuit
 from qiskit.providers import Backend
 from qiskit_aer import AerSimulator
+from qiskit_ibm_runtime import SamplerV2 as Sampler
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
 from quantum_qr.qr_io import read_qr_code
 from quantum_qr.payload import decode_payload, compute_tag, tags_to_secret
 from quantum_qr.config import get_key
 from quantum_qr.dj import oracle_from_secret_string, dj_circuit
+
+
+def run_counts(circuit: QuantumCircuit, backend: Optional[Backend] = None, shots: int = 1024) -> Dict[str, int]:
+    """
+    Run a circuit on any backend and return a counts dict.
+    
+    Args:
+        circuit: The QuantumCircuit to execute.
+        backend: Optional backend (AerSimulator or IBM Runtime backend).
+        shots: Number of times to execute the circuit.
+        
+    Returns:
+        Dict[str, int]: Histogram of measurement outcomes.
+    """
+    # 1. Fallback to local simulator path
+    if backend is None or isinstance(backend, AerSimulator):
+        sim = backend or AerSimulator()
+        compiled = transpile(circuit, sim)
+        return sim.run(compiled, shots=shots).result().get_counts()
+    
+    # 2. Modern Runtime path (IBM Hardware)
+    else:
+        # Transpile to ISA (Instruction Set Architecture) for the specific QPU
+        pm = generate_preset_pass_manager(backend=backend, optimization_level=1)
+        isa_circuit = pm.run(circuit)
+        
+        # Run via SamplerV2
+        sampler = Sampler(backend)
+        job = sampler.run([(isa_circuit,)], shots=shots)
+        
+        # Extract counts from the first pub result (using register 'c')
+        return job.result()[0].data.c.get_counts()
 
 
 def decide(
@@ -24,25 +58,6 @@ def decide(
 ) -> Dict[str, Any]:
     """
     Turn a quantum measurement shot-count histogram into a probabilistic verdict.
-
-    Evaluates the quantum measurement counts against a confidence floor and an
-    acceptance threshold to determine if the payload is authentic, tampered,
-    or if the result is inconclusive due to severe noise.
-
-    Args:
-        counts (Dict[str, int]): The measurement histogram from the quantum simulation or hardware.
-        n_bits (int): The number of bits in the quantum register.
-        accept_threshold (float, optional): The minimum probability of the all-zeros
-            state required to declare the QR authentic. Defaults to 0.5.
-        confidence_floor (float, optional): The minimum probability of the most frequent
-            state required to make a conclusive decision. Defaults to 0.0.
-
-    Returns:
-        Dict[str, Any]: A dictionary containing:
-            - verdict (str): "authentic", "tampered", "inconclusive", or "invalid".
-            - confidence (float): The probability of the single most frequent outcome.
-            - p_zeros (float): The probability of the all-zeros outcome.
-            - measured_secret (Optional[str]): The most frequent bitstring measured.
     """
     total_shots = sum(counts.values())
     if total_shots == 0:
@@ -90,32 +105,6 @@ def verify(
 ) -> Dict[str, Any]:
     """
     Read a QR code, run the Deutsch-Jozsa tamper check, and return a verdict.
-
-    This function orchestrates the entire verification pipeline: reading the image,
-    decoding the payload, computing the expected tag, constructing the quantum
-    circuits, executing the simulation, and applying the decision rule.
-
-    Args:
-        qr_path (str): The filesystem path to the QR code image.
-        n_bits (int, optional): The number of bits in the secret/tag. Defaults to 8.
-        key (Optional[bytes], optional): The secret key for HMAC. If None, it is loaded
-            from the environment via config. Defaults to None.
-        shots (int, optional): Number of quantum circuit executions. Defaults to 1024.
-        accept_threshold (float, optional): Threshold for P(zeros) to accept as authentic. Defaults to 0.5.
-        confidence_floor (float, optional): Minimum confidence to avoid an inconclusive result. Defaults to 0.0.
-        backend (Optional[Backend], optional): The Qiskit backend to execute the
-            circuit on. Defaults to AerSimulator() if None.
-
-    Returns:
-        Dict[str, Any]: A detailed dictionary containing the verification results:
-            - verdict (str): "authentic", "tampered", "invalid", or "inconclusive".
-            - confidence (float): The statistical confidence of the measurement.
-            - p_zeros (float): The raw probability of measuring the all-zeros state.
-            - measured_secret (Optional[str]): The observed bitstring.
-            - classical_secret (Optional[str]): The expected classical secret.
-            - data (Optional[str]): The decoded payload data.
-            - agree (bool): True if the measured secret indicates authenticity.
-            - reason (Optional[str]): Description of the error if the verdict is invalid.
     """
     # 1. Safely attempt to read and decode
     try:
@@ -149,13 +138,9 @@ def verify(
     oracle = oracle_from_secret_string(classical_secret)
     built_circuit = dj_circuit(oracle, n_bits)
 
-    # 5. Run on backend (Dependency Injection)
-    if backend is None:
-        backend = AerSimulator()
-
-    compiled_circuit = transpile(built_circuit, backend)
-    job = backend.run(compiled_circuit, shots=shots)
-    counts = job.result().get_counts()
+    # 5. Run using the new execution abstraction layer
+    # This automatically dispatches to local simulator or hardware as needed
+    counts = run_counts(built_circuit, backend=backend, shots=shots)
 
     # 6. Decide based on probability distribution
     decision = decide(

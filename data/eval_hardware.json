@@ -1,0 +1,47 @@
+[
+  {
+    "Fixture": "fixture_00_authentic.png",
+    "Expected": "authentic",
+    "Sim Verdict": "authentic",
+    "HW Verdict": "authentic",
+    "Sim P(zeros)": "N/A",
+    "HW P(zeros)": 0.9853515625,
+    "HW Confidence": 0.9853515625
+  },
+  {
+    "Fixture": "fixture_01_data.png",
+    "Expected": "tampered",
+    "Sim Verdict": "tampered",
+    "HW Verdict": "tampered",
+    "Sim P(zeros)": "N/A",
+    "HW P(zeros)": 0.005859375,
+    "HW Confidence": 0.9453125
+  },
+  {
+    "Fixture": "fixture_02_nonce.png",
+    "Expected": "tampered",
+    "Sim Verdict": "tampered",
+    "HW Verdict": "tampered",
+    "Sim P(zeros)": "N/A",
+    "HW P(zeros)": 0.001953125,
+    "HW Confidence": 0.8828125
+  },
+  {
+    "Fixture": "fixture_03_tag.png",
+    "Expected": "tampered",
+    "Sim Verdict": "tampered",
+    "HW Verdict": "tampered",
+    "Sim P(zeros)": "N/A",
+    "HW P(zeros)": 0.0205078125,
+    "HW Confidence": 0.9658203125
+  },
+  {
+    "Fixture": "fixture_04_forged.png",
+    "Expected": "tampered",
+    "Sim Verdict": "tampered",
+    "HW Verdict": "tampered",
+    "Sim P(zeros)": "N/A",
+    "HW P(zeros)": 0.00390625,
+    "HW Confidence": 0.71484375
+  }
+]
