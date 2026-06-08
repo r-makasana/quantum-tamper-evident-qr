@@ -101,4 +101,17 @@ A running log of what I learned each day building this project. Honest, conversa
 - The noise sweep plot (`data/noise_sweep.png`) is the first piece of analysis in this whole project that a classical HMAC simply couldn't produce — it's genuinely about quantum execution behaviour. Authentic `P(zeros)` starts at 1.0 and decays; tampered stays near 0; the threshold line shows the noise budget the verifier tolerates.
 - **Debugging lesson of the day:** my first sweep plot had both curves flat at zero. The tell was the noiseless endpoint — at p=0 the authentic curve *must* be 1.0, so a flat-zero authentic curve is a bug, not physics. The cause was the ancilla sneaking into the measurement register, so my `"0"*n_bits` lookup never matched the longer counts keys. **Always sanity-check the value you already know before trusting the rest of the curve.**
 
-## Day 15 — (next)
+## Day 15 — verify CLI Subcommand
+- Added the `verify` command, completing the CLI (`generate` + `verify`). The reserved subcommand slot from Day 10 meant it dropped in cleanly.
+- **Made the exit codes encode the verdict:** 0 authentic, 3 tampered, 4 invalid, 1 operational error, 2 usage. So the tool gates shell pipelines like `verify qr.png && release_funds.sh`, the way `grep` returns 1 on no match.
+- Thinking about how a tool *composes* with other tools — not just whether it runs — is a step up in how I design software.
+- Surfacing which bits differ on a tampered result shows the quantum measurement carried real information, not just a yes/no.
+
+## Day 16 — Verifier Polish + Backend Injection
+- Docstring and type-hint pass on `verifier.py` and `evaluate.py` to match the rest of the codebase.
+- **Made the quantum backend an injectable parameter**, defaulting to the simulator. Running on real hardware next week is now a one-line change — pass a different backend — not a rewrite.
+- That's the *fourth* time I've reached for the same pattern: make the swappable thing a parameter (nonce → argv → key → backend). It's becoming my signature move, and it's the right instinct every time.
+- Added `verify` and `decide` to the public API; bumped `__version__` to 0.2.0 now that verification exists.
+- Built a confusion-matrix plotter and rendered noiseless vs noisy side by side (`data/confusion_matrix.png`). The noiseless matrix proves the logic is correct; the noisy one previews what hardware will do — and shows which error type (false negative vs false positive) noise produces first. An honest, real result that also validates the plotting code before hardware data arrives.
+
+## Day 17 — (next)
