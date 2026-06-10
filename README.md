@@ -1,8 +1,10 @@
 # Quantum Tamper-Evident QR Codes
 
-![tests](https://github.com/r-makasana/quantum-tamper-evident-qr/actions/workflows/tests.yml/badge.svg)
+[![tests](https://github.com/r-makasana/quantum-tamper-evident-qr/actions/workflows/tests.yml/badge.svg)](https://github.com/r-makasana/quantum-tamper-evident-qr/actions/workflows/tests.yml)
 
 A QR code system that uses true quantum randomness for nonce generation and the Deutsch-Jozsa algorithm for single-query tamper verification. Built with Qiskit and run on real IBM Quantum hardware.
+
+> **Status:** Complete (v1.0). Generates and verifies tamper-evident QRs from the command line, runs on real IBM Quantum hardware, and is validated on a labeled corpus, a 1,000-sample blind holdout, and a simulator-vs-hardware benchmark.
 
 ![QR gallery — the same message produces two different codes thanks to a fresh quantum nonce each time](data/gallery.png)
 
@@ -31,18 +33,20 @@ The full payload schema, threat model, generate/verify flows, limitations, and p
 - `nonce` is 128 bits from the quantum RNG
 - `tag` is HMAC-SHA256(K, data || nonce) truncated to **n = 8 bits**
 - Verification XORs observed vs expected tag → secret `s` → `oracle_from_secret(s)` → DJ
-- Authentic → s = 0 → constant oracle → DJ measures zeros; tampered → s ≠ 0 → balanced → non-zero
+- Authentic → s = 0 → constant oracle → DJ measures zeros; tampered → s ≠ 0 → non-zero
 
 ## Results
 
-**Simulator (full corpus):** 100% accuracy, 100% recall, zero false negatives. Expected on a noiseless backend — it validates the pipeline and corpus consistency, not quantum advantage.
+**Simulator (full corpus):** 100% accuracy, 100% recall, zero false negatives. Expected on a noiseless backend — it validates the pipeline, not quantum advantage.
+
+**Blind holdout (1,000 samples, simulator):** 99.6% accuracy. Every error was a false negative from an 8-bit tag collision — observed 0.81% among tampered samples, consistent with the predicted 2⁻⁸ ≈ 0.39% bound within sampling variance. This empirically confirms the documented tag-width limitation rather than hiding it.
 
 **Real hardware (IBM `<backend name>` ← fill in, `<N>`-fixture subset):**
 - Subset accuracy: `<X>%` ← *fill in from `data/eval_hardware.json`*
 - Authentic P(zeros): 1.00 (simulator) → `<0.9x>` (hardware) ← *fill in*
-- `<note any false negatives or which fixtures degraded>` ← *fill in*
+- `<note any false negatives / which fixtures degraded>` ← *fill in*
 
-The gap is decoherence and gate error, amplified by the depth inflation transpilation introduces when mapping the circuit onto the device's native gate set and qubit connectivity. The Deutsch-Jozsa algorithm is correct in principle (perfect on the simulator) and measurably degrades on current NISQ hardware — a concrete, quantitative finding about today's devices.
+The hardware gap is decoherence and gate error, amplified by the depth inflation transpilation introduces when mapping the circuit onto the device's native gate set and connectivity. The Deutsch-Jozsa algorithm is correct in principle (perfect on the simulator) and measurably degrades on current NISQ hardware — a concrete, quantitative finding about today's devices.
 
 ![Verifier robustness: P(zeros) for authentic vs tampered QRs against depolarizing noise, with the accept threshold](data/noise_sweep.png)
 
@@ -68,13 +72,13 @@ The gap is decoherence and gate error, amplified by the depth inflation transpil
 **Command-Line Interface** (`quantum_qr/cli.py`, `quantum_qr/__main__.py`)
 - `python -m quantum_qr generate "<data>" -o out.png [-n 8] [--json]`
 - `python -m quantum_qr verify <path> [--shots N] [--threshold T] [--bits 8] [--json]`
-- Verdict-encoding exit codes (0/3/4) and friendly errors
+- Verdict-encoding exit codes (0 authentic / 3 tampered / 4 invalid / 1 error / 2 usage)
 
 **Supporting modules**
 - `payload.py` / `config.py` — HMAC tag, payload encode/decode, tags-to-secret, keyed via `QTQR_KEY`
 - `dj.py` — DJ circuit + oracles; `oracle_from_secret(s)` recovers s in one query (Bernstein-Vazirani)
 - `qrng.py` — 128-qubit Hadamard RNG, chi-square validated (p = 0.XX) ← *fill in*
-- `qr_io.py` — lossless QR encode/decode via `qrcode` + OpenCV
+- `qr_io.py` — lossless QR encode/decode via `qrcode` + `pyzbar`
 - `fixtures.py` — labeled corpus + `manifest.json` answer key
 
 ## Project structure
@@ -85,33 +89,30 @@ quantum-tamper-evident-qr/
 │   ├── __init__.py                   # Public API (generate, verify, decide, ...) + version
 │   ├── qrng.py                       # Quantum random number generator
 │   ├── dj.py                         # Deutsch-Jozsa circuit + oracles
-│   ├── qr_io.py                      # Classical QR encode/decode
+│   ├── qr_io.py                      # QR encode/decode (qrcode + pyzbar)
 │   ├── payload.py                    # HMAC tag, payload encode/decode, tags-to-secret
 │   ├── config.py                     # Shared-key handling
 │   ├── generator.py                  # End-to-end generate()
-│   ├── verifier.py                   # DJ verify() + decide() + run_counts() (backend-agnostic)
+│   ├── verifier.py                   # DJ verify() + decide() + run_counts()
 │   ├── evaluate.py                   # Corpus evaluation + confusion-matrix plot
 │   ├── fixtures.py                   # Authentic + tampered fixture builder
 │   ├── cli.py                        # argparse CLI (generate + verify)
 │   └── __main__.py                   # enables `python -m quantum_qr`
-├── notebooks/
-│   ├── day1_qrng.ipynb  …  day16_polish.ipynb
-│   ├── day17_hardware.ipynb          # First DJ run on real hardware
-│   └── day18_hardware_benchmark.ipynb# Sim-vs-hardware comparison
-├── tests/
-│   ├── test_qrng.py … test_evaluate.py   # all simulator-based; run in CI without credentials
+├── notebooks/                        # day1 … day18 exploration notebooks
+├── tests/                            # 43 simulator-based tests (run in CI)
 ├── data/
 │   ├── gallery.png
 │   ├── noise_sweep.png
 │   ├── confusion_matrix.png
-│   ├── eval_simulator.json           # frozen simulator baseline
-│   ├── eval_hardware.json            # real hardware subset results
-│   ├── hardware_run_n4.json          # first raw hardware counts
-│   ├── design_sketch.jpg
-│   └── fixtures/                     # generated QR corpus + manifest.json
-├── .github/workflows/tests.yml       # CI: pytest on every push
+│   ├── eval_simulator.json
+│   ├── eval_hardware.json
+│   ├── hardware_run_n4.json
+│   └── fixtures/                     # corpus + manifest.json
+├── blind_test.py                     # 1,000-sample blind holdout test
+├── blind_test_results.json           # blind-test summary (committed; images gitignored)
+├── .github/workflows/tests.yml       # CI: installs libzbar0, runs pytest on every push
 ├── DESIGN.md                         # Threat model, schema, flows, limitations, findings
-├── LEARNINGS.md                      # Daily learning log
+├── LEARNINGS.md                      # Daily learning log (Days 1–21)
 ├── LICENSE
 ├── requirements.txt
 └── README.md
@@ -122,12 +123,12 @@ quantum-tamper-evident-qr/
 Requires Python 3.10 or newer.
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/quantum-tamper-evident-qr.git
+git clone https://github.com/r-makasana/quantum-tamper-evident-qr.git
 cd quantum-tamper-evident-qr
 pip install -r requirements.txt
 ```
 
-Running on real hardware additionally requires a free IBM Quantum account (quantum.cloud.ibm.com) and saved credentials via `qiskit-ibm-runtime`. The simulator path and the full test suite need no credentials.
+`pyzbar` bundles its zbar library on Windows. On Linux/macOS install the system library too (`sudo apt-get install libzbar0` or `brew install zbar`). Running on real hardware additionally requires a free IBM Quantum account and saved credentials via `qiskit-ibm-runtime`; the simulator path and the test suite need no credentials.
 
 ## Quick start
 
@@ -138,7 +139,6 @@ generate("pay alice $10", "data/alice_payment.png")
 
 result = verify("data/alice_payment.png")
 print(result["verdict"])       # 'authentic'
-print(result["confidence"])    # ~1.0 on the simulator
 
 print(verify("data/fixtures/fixture_01_data.png")["verdict"])  # 'tampered'
 ```
@@ -156,22 +156,22 @@ Exit codes: `0` authentic, `3` tampered, `4` invalid, `1` operational error, `2`
 ## Testing
 
 ```bash
-pytest -v
+pytest -v        # 43 tests, simulator-only, no IBM credentials required
 ```
 
-All `<N>` ← *fill in* tests pass; CI runs them on every push (simulator-only, no IBM credentials required).
+CI runs the suite on every push (installing `libzbar0` for pyzbar first). The blind holdout is a separate manual script:
 
-## Roadmap
+```bash
+python blind_test.py
+```
 
-- [x] **Days 1–4** — QRNG, Deutsch-Jozsa (constant + balanced), QR encode/decode
-- [x] **Day 5** — Threat model, schema, verify-flow design (`DESIGN.md`)
-- [x] **Day 6** — HMAC tag, payload encode/decode, tamper bridge
-- [x] **Days 7–11** — Generator: core, robustness, fixtures, CLI, polish + gallery
-- [x] **Days 12–16** — Verifier: core, corpus accuracy, decision rule + noise, CLI verify, injectable backend
-- [x] **Day 17** — First Deutsch-Jozsa run on real IBM Quantum hardware
-- [x] **Day 18** — Hardware benchmark + simulator-vs-hardware comparison
-- [x] **Day 19** — Final documentation: results, findings, CI, repo hygiene
+## Limitations (honest summary)
 
+- **Keyed verification.** Only QRs issued with the shared `QTQR_KEY` can be verified; arbitrary third-party QRs return `invalid`. Key distribution is out of scope.
+- **Equivalent to classical HMAC.** A classical tag comparison detects the same tampering with less complexity. The Deutsch-Jozsa step demonstrates a real quantum algorithm end-to-end; it is not a security improvement over HMAC.
+- **8-bit tag.** A tampered QR has a 2⁻⁸ ≈ 0.39% chance of a tag collision (false negative), measured at 0.81% on the 1,000-sample blind test. A larger tag reduces this.
+- **NISQ noise.** On real hardware the DJ readout degrades; the verifier mitigates this with a confidence threshold and an "inconclusive" verdict.
+- **Verifies integrity, not intent.** A correctly-signed malicious message is "authentic" — the system proves a payload wasn't altered after issuing, not that its content is safe.
 
 ## References
 
