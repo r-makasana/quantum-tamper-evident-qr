@@ -1,6 +1,6 @@
 # Quantum Tamper-Evident QR Codes
 
-![tests](https://github.com/YOUR_USERNAME/quantum-tamper-evident-qr/actions/workflows/tests.yml/badge.svg)
+![tests](https://github.com/r-makasana/quantum-tamper-evident-qr/actions/workflows/tests.yml/badge.svg)
 
 A QR code system that uses true quantum randomness for nonce generation and the Deutsch-Jozsa algorithm for single-query tamper verification. Built with Qiskit and run on real IBM Quantum hardware.
 
