@@ -4,7 +4,7 @@
 
 A QR code system that uses true quantum randomness for nonce generation and the Deutsch-Jozsa algorithm for single-query tamper verification. Built with Qiskit and run on real IBM Quantum hardware.
 
-> **Status:** Complete (v1.0). Generates and verifies tamper-evident QRs from the command line, runs on real IBM Quantum hardware, and is validated on a labeled corpus, a 1,000-sample blind holdout, and a simulator-vs-hardware benchmark.
+> **Status:** Complete (v1.0). Generates and verifies tamper-evident QRs from the command line, runs on real IBM Quantum hardware, and is validated on a labeled corpus, a 1,000-sample blind holdout, and a simulator-vs-hardware comparison.
 
 ![QR gallery — the same message produces two different codes thanks to a fresh quantum nonce each time](data/gallery.png)
 
@@ -41,16 +41,18 @@ The full payload schema, threat model, generate/verify flows, limitations, and p
 
 **Blind holdout (1,000 samples, simulator):** 99.6% accuracy. Every error was a false negative from an 8-bit tag collision — observed 0.81% among tampered samples, consistent with the predicted 2⁻⁸ ≈ 0.39% bound within sampling variance. This empirically confirms the documented tag-width limitation rather than hiding it.
 
-**Real hardware (IBM `<backend name>` ← fill in, `<N>`-fixture subset):**
-- Subset accuracy: `<X>%` ← *fill in from `data/eval_hardware.json`*
-- Authentic P(zeros): 1.00 (simulator) → `<0.9x>` (hardware) ← *fill in*
-- `<note any false negatives / which fixtures degraded>` ← *fill in*
+**Real hardware (IBM `<backend name>` ← fill in, n = 4 authentic circuit, 1,024 shots):**
+- Measured the all-zeros outcome 1,010 / 1,024 times → **P(zeros) = 98.6%** (vs 100% on the simulator)
+- The remaining 1.4% scattered across `0001`, `0010`, `0100`, `1000` — real gate and readout noise
+- P(zeros) stayed far above the 0.5 accept threshold, so the circuit **verified correctly as authentic** despite device noise
 
-The hardware gap is decoherence and gate error, amplified by the depth inflation transpilation introduces when mapping the circuit onto the device's native gate set and connectivity. The Deutsch-Jozsa algorithm is correct in principle (perfect on the simulator) and measurably degrades on current NISQ hardware — a concrete, quantitative finding about today's devices.
+The small hardware gap is decoherence and gate error; it stays small here because the n = 4 circuit is shallow, so transpilation onto the device's native gates and connectivity adds little depth. Tampered detection was validated on the simulator and under a depolarizing noise model (below); the hardware demonstration covered the authentic case, as running the full tampered subset on hardware was limited by available QPU time.
+
+![Physical QPU results, n=4 authentic — 98.6% on the all-zeros outcome](data/hardware_run_n4.png)
 
 ![Verifier robustness: P(zeros) for authentic vs tampered QRs against depolarizing noise, with the accept threshold](data/noise_sweep.png)
 
-![Confusion matrix: noiseless simulator vs real hardware](data/confusion_matrix.png)
+![Confusion matrix: noiseless simulator vs noisy simulation](data/confusion_matrix.png)
 
 ## What's working
 
@@ -63,7 +65,7 @@ The hardware gap is decoherence and gate error, amplified by the depth inflation
 
 **Evaluation Harness** (`quantum_qr/evaluate.py`)
 - `evaluate_corpus(...)` — accuracy, recall, precision, confusion matrix, per-tamper-type breakdown
-- `plot_confusion_matrix(...)`; baselines in `data/eval_simulator.json` and `data/eval_hardware.json`
+- `plot_confusion_matrix(...)`; baseline in `data/eval_simulator.json`
 
 **Generator** (`quantum_qr/generator.py`)
 - `generate(data, output_path, n_bits=8, key=None, nonce=None)` — QRNG → HMAC tag → payload → QR image
@@ -104,15 +106,15 @@ quantum-tamper-evident-qr/
 │   ├── gallery.png
 │   ├── noise_sweep.png
 │   ├── confusion_matrix.png
+│   ├── hardware_run_n4.png           # physical QPU histogram (n=4 authentic)
+│   ├── hardware_run_n4.json          # raw QPU counts
 │   ├── eval_simulator.json
-│   ├── eval_hardware.json
-│   ├── hardware_run_n4.json
 │   └── fixtures/                     # corpus + manifest.json
 ├── blind_test.py                     # 1,000-sample blind holdout test
-├── blind_test_results.json           # blind-test summary (committed; images gitignored)
+├── blind_test_results.json           # blind-test summary (images gitignored)
 ├── .github/workflows/tests.yml       # CI: installs libzbar0, runs pytest on every push
 ├── DESIGN.md                         # Threat model, schema, flows, limitations, findings
-├── LEARNINGS.md                      # Daily learning log (Days 1–21)
+├── LEARNINGS.md                      # Daily learning log
 ├── LICENSE
 ├── requirements.txt
 └── README.md
@@ -151,26 +153,23 @@ python -m quantum_qr verify data/alice.png          # exit code encodes the verd
 python -m quantum_qr verify data/alice.png --json
 ```
 
-Exit codes: `0` authentic, `3` tampered, `4` invalid, `1` operational error, `2` usage error — so the tool gates shell pipelines, e.g. `python -m quantum_qr verify qr.png && ./next_step.sh`.
+Exit codes: `0` authentic, `3` tampered, `4` invalid, `1` operational error, `2` usage error.
 
 ## Testing
 
 ```bash
 pytest -v        # 43 tests, simulator-only, no IBM credentials required
+python blind_test.py   # 1,000-sample blind holdout
 ```
 
-CI runs the suite on every push (installing `libzbar0` for pyzbar first). The blind holdout is a separate manual script:
-
-```bash
-python blind_test.py
-```
+CI runs the suite on every push (installing `libzbar0` for pyzbar first).
 
 ## Limitations (honest summary)
 
 - **Keyed verification.** Only QRs issued with the shared `QTQR_KEY` can be verified; arbitrary third-party QRs return `invalid`. Key distribution is out of scope.
 - **Equivalent to classical HMAC.** A classical tag comparison detects the same tampering with less complexity. The Deutsch-Jozsa step demonstrates a real quantum algorithm end-to-end; it is not a security improvement over HMAC.
 - **8-bit tag.** A tampered QR has a 2⁻⁸ ≈ 0.39% chance of a tag collision (false negative), measured at 0.81% on the 1,000-sample blind test. A larger tag reduces this.
-- **NISQ noise.** On real hardware the DJ readout degrades; the verifier mitigates this with a confidence threshold and an "inconclusive" verdict.
+- **NISQ noise.** On real hardware the DJ readout degrades (98.6% on the n=4 authentic circuit vs 100% in simulation); the verifier mitigates this with a confidence threshold and an "inconclusive" verdict.
 - **Verifies integrity, not intent.** A correctly-signed malicious message is "authentic" — the system proves a payload wasn't altered after issuing, not that its content is safe.
 
 ## References
