@@ -48,7 +48,7 @@ The full payload schema, threat model, generate/verify flows, limitations, and p
 
 The small hardware gap is decoherence and gate error; it stays small here because the n = 4 circuit is shallow, so transpilation onto the device's native gates and connectivity adds little depth. Tampered detection was validated on the simulator and under a depolarizing noise model (below); the hardware demonstration covered the authentic case, as running the full tampered subset on hardware was limited by available QPU time.
 
-![Physical QPU results, n=4 authentic — 98.6% on the all-zeros outcome](data/hardware_run_n4.png)
+![Physical QPU results, n=4 authentic — 98.6% on the all-zeros outcome](data/hardware_histogram.png)
 
 ![Verifier robustness: P(zeros) for authentic vs tampered QRs against depolarizing noise, with the accept threshold](data/noise_sweep.png)
 
